@@ -13,7 +13,7 @@ media3 = "1.11.0"
 mediarouter = "1.8.1"
 castFramework = "22.3.1"
 junit = "4.13.2"
-robolectric = "4.16.1"
+robolectric = "4.17"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
