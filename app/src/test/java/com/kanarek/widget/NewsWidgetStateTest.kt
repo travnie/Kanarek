@@ -1,5 +1,6 @@
 package com.kanarek.widget
 
+import com.kanarek.R
 import com.kanarek.data.NewsItem
 import com.kanarek.data.SettingsStore
 import org.junit.Assert.assertEquals
@@ -74,6 +75,17 @@ class NewsWidgetStateTest {
 
         assertEquals(listOf("https://example.com/fallback"), normalized.feeds)
         assertEquals(3, normalized.intervalSeconds)
+    }
+
+    @Test
+    fun slideshowUsesPrecompiledRemoteViewsLayouts() {
+        assertEquals(R.layout.widget_static, newsWidgetLayoutId(SettingsStore.INTERVAL_OFF))
+        assertEquals(R.layout.widget_interval_5s, newsWidgetLayoutId(5))
+        assertEquals(R.layout.widget, newsWidgetLayoutId(7))
+        assertEquals(R.layout.widget_interval_10s, newsWidgetLayoutId(10))
+        assertEquals(R.layout.widget_interval_15s, newsWidgetLayoutId(15))
+        assertEquals(R.layout.widget_interval_30s, newsWidgetLayoutId(30))
+        assertEquals(R.layout.widget, newsWidgetLayoutId(120))
     }
 
     @Test

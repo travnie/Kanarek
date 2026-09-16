@@ -30,6 +30,25 @@ private data class NewsWidgetRender(
     val sizeClass: WidgetSizeClass,
 )
 
+// AdapterViewFlipper.setFlipInterval is not RemoteViews-safe on Android 13; encode
+// supported slideshow intervals in XML so the host never receives a forbidden reflection action.
+internal fun newsWidgetLayoutId(intervalSeconds: Int): Int =
+    when (intervalSeconds) {
+        SettingsStore.INTERVAL_OFF -> R.layout.widget_static
+        5 -> R.layout.widget_interval_5s
+        7 -> R.layout.widget
+        10 -> R.layout.widget_interval_10s
+        15 -> R.layout.widget_interval_15s
+        30 -> R.layout.widget_interval_30s
+        else -> R.layout.widget
+    }
+
+internal fun newsWidgetRemoteViews(context: Context, appWidgetId: Int): RemoteViews {
+    val interval = NewsWidgetStore(context).config(appWidgetId)?.intervalSeconds
+        ?: SettingsStore.DEFAULT_INTERVAL
+    return RemoteViews(context.packageName, newsWidgetLayoutId(interval))
+}
+
 /** Home-screen widget: a resizable, auto-advancing news slideshow. */
 class KanarekWidgetProvider : AppWidgetProvider() {
     override fun onUpdate(
@@ -173,12 +192,7 @@ class KanarekWidgetProvider : AppWidgetProvider() {
         lastUpdatedMillis: Long?,
         sizeClass: WidgetSizeClass = WidgetSizeClass.REGULAR,
     ): RemoteViews {
-        val layoutId =
-            if (config.intervalSeconds == SettingsStore.INTERVAL_OFF) {
-                R.layout.widget_static
-            } else {
-                R.layout.widget
-            }
+        val layoutId = newsWidgetLayoutId(config.intervalSeconds)
         val views =
             RemoteViews(context.packageName, layoutId).apply {
                 val serviceIntent =
@@ -188,10 +202,6 @@ class KanarekWidgetProvider : AppWidgetProvider() {
                     }
                 setRemoteAdapter(R.id.news_flipper, serviceIntent)
                 setEmptyView(R.id.news_flipper, R.id.widget_empty)
-                if (config.intervalSeconds != SettingsStore.INTERVAL_OFF) {
-                    setInt(R.id.news_flipper, "setFlipInterval", config.intervalSeconds * 1_000)
-                }
-
                 val openTemplate =
                     PendingIntent.getActivity(
                         context,
@@ -305,7 +315,7 @@ class KanarekWidgetProvider : AppWidgetProvider() {
             if (appWidgetId == AppWidgetManager.INVALID_APPWIDGET_ID) return
             val manager = AppWidgetManager.getInstance(context)
             val views =
-                RemoteViews(context.packageName, R.layout.widget).apply {
+                newsWidgetRemoteViews(context, appWidgetId).apply {
                     applyStatus(context, this, status, lastUpdatedMillis)
                     applyWidgetSize(
                         views = this,
