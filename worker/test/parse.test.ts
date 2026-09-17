@@ -305,3 +305,21 @@ describe("buildAtom", () => {
     expect(items[1].image).toBeNull();
   });
 });
+
+describe("invalid numeric entities", () => {
+  it("replaces out-of-range and surrogate code points without throwing", () => {
+    expect(decode("ok &#128512; &#x1F600;")).toBe("ok 😀 😀");
+    expect(decode("bad &#1114112; &#x110000; &#55296; &#xDFFF;")).toBe("bad � � � �");
+  });
+
+  it("keeps valid feed entries when a sibling contains an invalid entity", () => {
+    const rss = `<?xml version="1.0"?><rss version="2.0"><channel><title>Example</title>
+      <item><title>Good</title><link>https://example.com/good</link></item>
+      <item><title><![CDATA[Bad &#1114112;]]></title><link>https://example.com/bad</link></item>
+    </channel></rss>`;
+
+    const items = parseFeed(rss);
+
+    expect(items.map((item) => item.title)).toEqual(["Good", "Bad �"]);
+  });
+});
