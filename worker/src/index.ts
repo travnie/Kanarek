@@ -827,7 +827,7 @@ async function fetchFeed(feedUrl: string, env: Env): Promise<NewsItem[]> {
     });
     if (!res.ok) throw new Error(`${feedUrl}: HTTP ${res.status}`);
     const xml = await readCapped(res, MAX_FEED_BYTES);
-    return parseFeed(xml);
+    return parseFeedOrThrow(xml);
   } finally {
     clearTimeout(t);
   }
@@ -852,12 +852,15 @@ async function fetchFeed(feedUrl: string, env: Env): Promise<NewsItem[]> {
 //     that ship a full body but no/short <description>.
 
 export function parseFeed(input: string): NewsItem[] {
-  let feed: FsFeed;
   try {
-    feed = parseFeedSmith(input).feed as FsFeed;
+    return parseFeedOrThrow(input);
   } catch {
-    return []; // garbage in -> empty out (per-source isolation)
+    return []; // garbage in -> empty out for tolerant direct callers
   }
+}
+
+function parseFeedOrThrow(input: string): NewsItem[] {
+  const feed = parseFeedSmith(input).feed as FsFeed;
   const source = decode(stripTags(String(feed?.title || ""))).trim();
   const entries: FsEntry[] = feed?.entries || feed?.items || [];
   const items: NewsItem[] = [];

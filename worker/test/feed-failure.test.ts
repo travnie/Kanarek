@@ -46,6 +46,22 @@ describe("feed refresh failure contract", () => {
     expect(cache.put).not.toHaveBeenCalled();
   });
 
+  it("treats HTTP 200 with an unparsable feed body as a failed source", async () => {
+    const cache = cacheStub();
+    vi.stubGlobal("fetch", vi.fn(async () => new Response("definitely not a feed", { status: 200 })));
+    const { ctx, waits } = context();
+    const url = new URL("https://worker.test/?feeds=https://broken.test/feed");
+
+    const response = await handleFeeds(new Request(url), url, {}, ctx);
+    const body = await response.json() as { error: string; sources: Array<{ status: string }> };
+    await Promise.all(waits);
+
+    expect(response.status).toBe(502);
+    expect(body.error).toBe("all feeds failed");
+    expect(body.sources).toEqual([{ url: "https://broken.test/feed", status: "error" }]);
+    expect(cache.put).not.toHaveBeenCalled();
+  });
+
   it("returns and caches partial results with per-source status", async () => {
     const cache = cacheStub();
     vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL) => {
