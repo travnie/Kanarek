@@ -338,6 +338,20 @@ class PlayerService : MediaSessionService() {
         activePlayer.prepare()
     }
 
+    /** Detach the video surface right now, synchronously - call this *before* triggering an
+     *  inline<->fullscreen swap, not from the old SurfaceView's surfaceDestroyed callback. Android
+     *  force-disconnects a SurfaceView's BufferQueue producer synchronously with that callback; if
+     *  MediaCodec still holds a live connection at that instant (as it does with the deferred
+     *  release in [setVideoSurface]), that force-disconnect is a fatal MediaCodecVideoRenderer
+     *  crash, not a clean handoff - confirmed on-device, 100% reproducible on every fullscreen
+     *  toggle while a video station is playing. Releasing here, before Compose tears the old
+     *  AndroidView down, lets ExoPlayer detach from the surface through its own API first. */
+    fun releaseVideoSurfaceForHandoff() {
+        videoSurfaceGeneration++
+        currentVideoSurface = null
+        player.clearVideoSurface()
+    }
+
     /** Attach a valid output immediately. Null means a view is going away; defer that detach long
      *  enough for a replacement fullscreen/inline surface to attach, then clear only when the same
      *  surface is still current and has actually become invalid. */
