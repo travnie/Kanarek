@@ -10,7 +10,7 @@ class FakeElement {
 }
 
 class FakeHTMLRewriter {
-  private handlers = new Map<string, any>();
+  protected handlers = new Map<string, any>();
   on(selector: string, handler: any) { this.handlers.set(selector, handler); return this; }
   transform(response: Response) {
     const item = new FakeElement();
@@ -32,6 +32,29 @@ class FakeHTMLRewriter {
   }
 }
 
+
+class FakeOmittedParagraphEndRewriter extends FakeHTMLRewriter {
+  transform(response: Response) {
+    const handlers = (this as any).handlers as Map<string, any>;
+    const item = new FakeElement();
+    const link = new FakeElement({ href: "/story" });
+    const first = new FakeElement();
+    const second = new FakeElement();
+    handlers.get(".card")?.element?.(item);
+    handlers.get(".card a")?.element?.(link);
+    handlers.get(".card a")?.text?.({ text: "Story", lastInTextNode: true });
+    const p = handlers.get(".card p");
+    p?.element?.(first);
+    p?.text?.({ text: "One", lastInTextNode: true });
+    p?.element?.(second);
+    p?.text?.({ text: "Two", lastInTextNode: true });
+    second.close();
+    first.close();
+    item.close();
+    return response;
+  }
+}
+
 afterEach(() => vi.unstubAllGlobals());
 
 describe("scraper nested text", () => {
@@ -39,5 +62,11 @@ describe("scraper nested text", () => {
     vi.stubGlobal("HTMLRewriter", FakeHTMLRewriter);
     const items = await extractItems("<ignored>", ".card", "https://example.com/page");
     expect(items).toEqual([{ title: "Before bold after", link: "https://example.com/story", summary: "First emphasis last", image: null }]);
+  });
+
+  it("stops the first summary when another paragraph starts without an end callback", async () => {
+    vi.stubGlobal("HTMLRewriter", FakeOmittedParagraphEndRewriter);
+    const items = await extractItems("<ignored>", ".card", "https://example.com/page");
+    expect(items[0]?.summary).toBe("One");
   });
 });

@@ -492,6 +492,8 @@ export async function extractItems(html: string, itemSel: string, pageUrl: strin
   let capTitle = false;
   let capSummary = false;
   let capLinkText = false;
+  let titleCaptureId = 0;
+  let summaryCaptureId = 0;
 
   const push = () => {
     if (!cur) return;
@@ -507,13 +509,17 @@ export async function extractItems(html: string, itemSel: string, pageUrl: strin
     }
     cur = null;
     capTitle = capSummary = capLinkText = false;
+    titleCaptureId++;
+    summaryCaptureId++;
   };
 
   const heading = {
     element(el: Element) {
-      if (!cur || cur.title || capTitle) return;
+      const captureId = ++titleCaptureId;
+      capTitle = false;
+      if (!cur || cur.title) return;
       capTitle = true;
-      el.onEndTag(() => { capTitle = false; });
+      el.onEndTag(() => { if (titleCaptureId === captureId) capTitle = false; });
     },
     text(t: Text) { if (cur && capTitle) cur.title += t.text; },
   };
@@ -553,9 +559,11 @@ export async function extractItems(html: string, itemSel: string, pageUrl: strin
     })
     .on(`${itemSel} p`, {
       element(el) {
-        if (!cur || cur.summary || capSummary) return;
+        const captureId = ++summaryCaptureId;
+        capSummary = false;
+        if (!cur || cur.summary) return;
         capSummary = true;
-        el.onEndTag(() => { capSummary = false; });
+        el.onEndTag(() => { if (summaryCaptureId === captureId) capSummary = false; });
       },
       text(t) { if (cur && capSummary) cur.summary += t.text; },
     })
