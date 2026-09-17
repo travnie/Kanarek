@@ -865,20 +865,24 @@ function parseFeedOrThrow(input: string): NewsItem[] {
   const entries: FsEntry[] = feed?.entries || feed?.items || [];
   const items: NewsItem[] = [];
   for (const e of entries) {
-    const title = decode(stripTags(String(e?.title || ""))).trim();
-    const link = pickLink(e);
-    if (!title || !link) continue;
-    const summaryRaw = firstStr(e?.summary, e?.description, e?.content_text, contentStr(e?.content), e?.content_html);
-    const authorRaw = firstStr(e?.dc?.creator, e?.authors?.[0]?.name);
-    items.push({
-      title,
-      link: decode(link).trim(),
-      summary: stripTags(decode(stripTags(summaryRaw))).trim().slice(0, 280),
-      image: pickImage(e),
-      date: normDate(firstStr(e?.published, e?.pubDate, e?.updated, e?.date_published, e?.date_modified, e?.date)),
-      source: source || hostOf(link),
-      author: authorRaw ? decode(stripTags(authorRaw)).trim() || null : null,
-    });
+    try {
+      const title = decode(stripTags(String(e?.title || ""))).trim();
+      const link = pickLink(e);
+      if (!title || !link) continue;
+      const summaryRaw = firstStr(e?.summary, e?.description, e?.content_text, contentStr(e?.content), e?.content_html);
+      const authorRaw = firstStr(e?.dc?.creator, e?.authors?.[0]?.name);
+      items.push({
+        title,
+        link: decode(link).trim(),
+        summary: stripTags(decode(stripTags(summaryRaw))).trim().slice(0, 280),
+        image: pickImage(e),
+        date: normDate(firstStr(e?.published, e?.pubDate, e?.updated, e?.date_published, e?.date_modified, e?.date)),
+        source: source || hostOf(link),
+        author: authorRaw ? decode(stripTags(authorRaw)).trim() || null : null,
+      });
+    } catch {
+      // A malformed entry must not discard valid siblings from the same feed.
+    }
   }
   return items;
 }
@@ -973,13 +977,21 @@ export function stripTags(s: string): string {
   // stripComments walks with indexOf, and the tag class excludes '<' so it can't backtrack.
   return stripComments(s).replace(/<[^<>]+>/g, " ").replace(/\s+/g, " ");
 }
+function decodeCodePoint(raw: string, radix: number): string {
+  const codePoint = Number.parseInt(raw, radix);
+  if (!Number.isFinite(codePoint) || codePoint < 0 || codePoint > 0x10FFFF || (codePoint >= 0xD800 && codePoint <= 0xDFFF)) {
+    return "\uFFFD";
+  }
+  return String.fromCodePoint(codePoint);
+}
+
 export function decode(s: string): string {
   return s
     .replace(/&lt;/g, "<").replace(/&gt;/g, ">")
     .replace(/&quot;/g, '"').replace(/&#0?39;/g, "'").replace(/&apos;/g, "'")
     .replace(/&#x2F;/gi, "/").replace(/&nbsp;/g, " ")
-    .replace(/&#(\d+);/g, (_, n) => String.fromCodePoint(+n))
-    .replace(/&#x([0-9a-f]+);/gi, (_, n) => String.fromCodePoint(parseInt(n, 16)))
+    .replace(/&#(\d+);/g, (_, n: string) => decodeCodePoint(n, 10))
+    .replace(/&#x([0-9a-f]+);/gi, (_, n: string) => decodeCodePoint(n, 16))
     .replace(/&amp;/g, "&");
 }
 export function normDate(s: string): string | null {
