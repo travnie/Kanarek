@@ -29,6 +29,7 @@ import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.FileDownload
 import androidx.compose.material.icons.filled.FileUpload
 import androidx.compose.material.icons.filled.Fullscreen
+import androidx.compose.material.icons.filled.FullscreenExit
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Pause
@@ -320,6 +321,7 @@ internal fun PlayerStationContent(
                     service = service,
                     videoSize = videoSize,
                     onExpand = { onFullscreenChange(true) },
+                    onTogglePlayback = { service?.togglePlayPause() },
                 )
             }
         }
@@ -327,6 +329,7 @@ internal fun PlayerStationContent(
             FullscreenVideo(
                 service = service,
                 videoSize = videoSize,
+                onTogglePlayback = { service?.togglePlayPause() },
                 onCollapse = { onFullscreenChange(false) },
             )
         }
@@ -580,6 +583,7 @@ private fun VideoArea(
     service: PlayerService?,
     videoSize: VideoSize,
     onExpand: () -> Unit,
+    onTogglePlayback: () -> Unit,
 ) {
     val ratio = videoAspectRatio(videoSize)
     Box(
@@ -588,7 +592,7 @@ private fun VideoArea(
                 .fillMaxWidth()
                 .height(180.dp)
                 .background(Color.Black)
-                .clickable(onClick = onExpand),
+                .clickable(onClick = onTogglePlayback),
         contentAlignment = Alignment.Center,
     ) {
         VideoSurface(
@@ -598,15 +602,16 @@ private fun VideoArea(
                     .fillMaxHeight()
                     .aspectRatio(ratio),
         )
-        Icon(
-            Icons.Filled.Fullscreen,
-            contentDescription = stringResource(R.string.video_fullscreen_enter),
-            tint = Color.White,
-            modifier =
-                Modifier
-                    .align(Alignment.BottomEnd)
-                    .padding(8.dp),
-        )
+        IconButton(
+            onClick = onExpand,
+            modifier = Modifier.align(Alignment.BottomEnd),
+        ) {
+            Icon(
+                Icons.Filled.Fullscreen,
+                contentDescription = stringResource(R.string.video_fullscreen_enter),
+                tint = Color.White,
+            )
+        }
     }
 }
 
@@ -626,6 +631,7 @@ private fun FullscreenVideo(
     service: PlayerService?,
     videoSize: VideoSize,
     onCollapse: () -> Unit,
+    onTogglePlayback: () -> Unit,
 ) {
     val context = LocalContext.current
     val activity = remember(context) { context.findActivity() }
@@ -658,7 +664,7 @@ private fun FullscreenVideo(
                 Modifier
                     .fillMaxSize()
                     .background(Color.Black)
-                    .clickable(onClick = onCollapse),
+                    .clickable(onClick = onTogglePlayback),
             contentAlignment = Alignment.Center,
         ) {
             VideoSurface(
@@ -668,6 +674,19 @@ private fun FullscreenVideo(
                         .fillMaxWidth()
                         .aspectRatio(videoAspectRatio(videoSize)),
             )
+            IconButton(
+                onClick = onCollapse,
+                modifier =
+                    Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(8.dp),
+            ) {
+                Icon(
+                    Icons.Filled.FullscreenExit,
+                    contentDescription = stringResource(R.string.video_fullscreen_exit),
+                    tint = Color.White,
+                )
+            }
         }
     }
 }
