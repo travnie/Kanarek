@@ -486,12 +486,14 @@ function usableImg(src: string | null): string | null {
   return s;
 }
 
-async function extractItems(html: string, itemSel: string, pageUrl: string): Promise<ScrapeItem[]> {
+export async function extractItems(html: string, itemSel: string, pageUrl: string): Promise<ScrapeItem[]> {
   const items: ScrapeItem[] = [];
   let cur: { title: string; linkText: string; link: string; summary: string; image: string | null } | null = null;
   let capTitle = false;
   let capSummary = false;
   let capLinkText = false;
+  let titleCaptureId = 0;
+  let summaryCaptureId = 0;
 
   const push = () => {
     if (!cur) return;
@@ -507,11 +509,19 @@ async function extractItems(html: string, itemSel: string, pageUrl: string): Pro
     }
     cur = null;
     capTitle = capSummary = capLinkText = false;
+    titleCaptureId++;
+    summaryCaptureId++;
   };
 
   const heading = {
-    element() { if (cur && !cur.title) capTitle = true; },
-    text(t: Text) { if (cur && capTitle) { cur.title += t.text; if (t.lastInTextNode) capTitle = false; } },
+    element(el: Element) {
+      const captureId = ++titleCaptureId;
+      capTitle = false;
+      if (!cur || cur.title) return;
+      capTitle = true;
+      el.onEndTag(() => { if (titleCaptureId === captureId) capTitle = false; });
+    },
+    text(t: Text) { if (cur && capTitle) cur.title += t.text; },
   };
 
   await new HTMLRewriter()
@@ -548,8 +558,14 @@ async function extractItems(html: string, itemSel: string, pageUrl: string): Pro
       },
     })
     .on(`${itemSel} p`, {
-      element() { if (cur && !cur.summary && !capSummary) capSummary = true; },
-      text(t) { if (cur && capSummary) { cur.summary += t.text; if (t.lastInTextNode) capSummary = false; } },
+      element(el) {
+        const captureId = ++summaryCaptureId;
+        capSummary = false;
+        if (!cur || cur.summary) return;
+        capSummary = true;
+        el.onEndTag(() => { if (summaryCaptureId === captureId) capSummary = false; });
+      },
+      text(t) { if (cur && capSummary) cur.summary += t.text; },
     })
     .transform(new Response(html))
     .arrayBuffer(); // drive the stream so the handlers above run
