@@ -333,7 +333,12 @@ internal fun PlayerScreen(
             service = bound,
             videoSize = videoSize,
             fullscreen = fullscreen,
-            onFullscreenChange = { fullscreen = it },
+            onFullscreenChange = {
+                // Release the old surface before Compose swaps VideoArea/FullscreenVideo -
+                // see PlayerService.releaseVideoSurfaceForHandoff.
+                bound?.releaseVideoSurfaceForHandoff()
+                fullscreen = it
+            },
             onFilterChange = { filter ->
                 uiState = uiState.copy(filter = filter)
             },
