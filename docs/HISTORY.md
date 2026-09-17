@@ -21,6 +21,10 @@ Current build/toolchain versions live in the repository configuration:
 
 ## Zrobione (chronologicznie)
 
+- **Lista źródeł przeniesiona z poziomego paska chipów na główny ekran do osobnego dialogu**
+  (`ReaderSourceListDialog`, otwierany przyciskiem filtra w `ReaderTopBar`): poprzedni
+  `ReaderSourcePicker` ucinał źródła poza krawędzią ekranu i nie miał wyszukiwania. Ta sama
+  logika wyboru/ulubionych, teraz jako przewijana pionowo lista z polem szukania.
 - **Model builda zgodny z AGP 10**: włączone built-in Kotlin i nowy DSL już na AGP 9.3;
   usunięty `kotlin.android`, Compose compiler i JVM 17 pozostają skonfigurowane jawnie.
 - **Testy inflacji widżetów (Robolectric)**: oba providery dostały seam `buildViews`, który

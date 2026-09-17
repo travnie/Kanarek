@@ -174,4 +174,5 @@
     <string name="scrape_failed">Couldn\'t extract stories from that page.</string>
     <string name="seed_samples">Load sample stations</string>
     <string name="video_fullscreen_enter">Fullscreen</string>
+    <string name="video_fullscreen_exit">Exit fullscreen</string>
 </resources>

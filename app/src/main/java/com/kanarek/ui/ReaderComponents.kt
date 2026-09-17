@@ -25,6 +25,7 @@ import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.BookmarkBorder
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Clear
+import androidx.compose.material.icons.filled.FilterList
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
@@ -90,6 +91,7 @@ internal fun ReaderTopBar(
     onBack: () -> Unit,
     onMenu: () -> Unit,
     onRefresh: () -> Unit,
+    onOpenSources: () -> Unit = {},
     onSettings: () -> Unit,
     scrollBehavior: TopAppBarScrollBehavior? = null,
 ) {
@@ -102,6 +104,12 @@ internal fun ReaderTopBar(
                 }
             },
             actions = {
+                IconButton(onClick = onOpenSources) {
+                    Icon(
+                        Icons.Filled.FilterList,
+                        contentDescription = stringResource(R.string.reader_sources),
+                    )
+                }
                 IconButton(onClick = onRefresh) {
                     Icon(
                         Icons.Filled.Refresh,
