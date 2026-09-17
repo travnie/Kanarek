@@ -232,10 +232,10 @@ private fun PlayerControlButtons(
             ),
     ) {
         Icon(
-            if (playerState.isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
+            if (playbackActive) Icons.Filled.Pause else Icons.Filled.PlayArrow,
             contentDescription =
                 stringResource(
-                    if (playerState.isPlaying) R.string.action_pause else R.string.action_play,
+                    if (playbackActive) R.string.action_pause else R.string.action_play,
                 ),
             modifier = Modifier.size(34.dp),
         )

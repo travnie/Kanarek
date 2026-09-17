@@ -119,6 +119,13 @@ class PlayerService : MediaSessionService() {
     private var retryJob: Job? = null
     private var retryGeneration = 0L
 
+    /** A flaky stream can briefly reach isPlaying/STATE_READY before failing again. Only clearing
+     *  the automatic-retry budget after playback holds for [STABILITY_RESET_DELAY_MS] - not on
+     *  every transient blip - stops that from silently resetting the retry count on each blip and
+     *  turning the bounded backoff in [PlayerFailureMachine] into an unbounded play/stop loop. */
+    private var stabilityJob: Job? = null
+    private var stabilityGeneration = 0L
+
     private val binder = LocalBinder()
 
     inner class LocalBinder : Binder() {
@@ -171,12 +178,12 @@ class PlayerService : MediaSessionService() {
         playerListener =
             object : Player.Listener {
                 override fun onIsPlayingChanged(isPlaying: Boolean) {
-                    if (isPlaying) clearFailure()
+                    if (isPlaying) onPlaybackRecovering()
                     pushState()
                 }
 
                 override fun onPlaybackStateChanged(playbackState: Int) {
-                    if (playbackState == Player.STATE_READY) clearFailure()
+                    if (playbackState == Player.STATE_READY) onPlaybackRecovering()
                     pushState()
                 }
 
@@ -432,6 +439,9 @@ class PlayerService : MediaSessionService() {
 
     private fun handlePlayerError(error: PlaybackException) {
         retryJob?.cancel()
+        stabilityJob?.cancel()
+        stabilityJob = null
+        stabilityGeneration++
         val kind = PlayerFailures.classify(error.errorCode)
         val transition = failureMachine.onError(kind, findHttpStatus(error))
         val failure = transition.failure
@@ -461,19 +471,32 @@ class PlayerService : MediaSessionService() {
             }
     }
 
-    private fun clearFailure() {
-        if (_uiState.value.failure == null) return
+    /** Playback reached isPlaying/STATE_READY. Clears the visible error right away (it's not
+     *  failing right now), but only restores the automatic-retry budget once that holds for
+     *  [STABILITY_RESET_DELAY_MS] - see [stabilityJob]'s doc. */
+    private fun onPlaybackRecovering() {
         retryJob?.cancel()
         retryJob = null
         retryGeneration++
-        failureMachine.reset()
-        _uiState.value = _uiState.value.copy(failure = null, nowPlaying = null)
+        if (_uiState.value.failure != null) {
+            _uiState.value = _uiState.value.copy(failure = null, nowPlaying = null)
+        }
+        val generation = ++stabilityGeneration
+        stabilityJob?.cancel()
+        stabilityJob =
+            scope.launch {
+                delay(STABILITY_RESET_DELAY_MS)
+                if (generation == stabilityGeneration) failureMachine.reset()
+            }
     }
 
     private fun resetFailure() {
         retryJob?.cancel()
         retryJob = null
         retryGeneration++
+        stabilityJob?.cancel()
+        stabilityJob = null
+        stabilityGeneration++
         failureMachine.reset()
         _uiState.value = _uiState.value.copy(failure = null, nowPlaying = null)
     }
@@ -569,6 +592,7 @@ class PlayerService : MediaSessionService() {
 
     override fun onDestroy() {
         retryJob?.cancel()
+        stabilityJob?.cancel()
         session.release()
         CastGlue.releaseCastPlayer(castPlayer)
         player.release()
@@ -587,6 +611,7 @@ class PlayerService : MediaSessionService() {
         private const val MAX_IMAGE_PX = 200
         private const val MAX_IMAGE_BYTES = 3 * 1024 * 1024
         private const val SURFACE_RELEASE_DELAY_MS = 750L
+        private const val STABILITY_RESET_DELAY_MS = 10_000L
 
         private fun Station.toMediaItem(): MediaItem =
             MediaItem
