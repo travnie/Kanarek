@@ -143,7 +143,7 @@ export default {
 
 // --- /?feeds= : RSS/Atom merge; default JSON unchanged, optional format=atom|rss ---
 
-async function handleFeeds(req: Request, url: URL, env: Env, ctx: ExecutionContext): Promise<Response> {
+export async function handleFeeds(req: Request, url: URL, env: Env, ctx: ExecutionContext): Promise<Response> {
   const inm = req.headers.get("if-none-match");
 
   const cache = caches.default;
@@ -173,6 +173,17 @@ async function handleFeeds(req: Request, url: URL, env: Env, ctx: ExecutionConte
   if (!valid.length) return json({ error: "no valid/allowed feeds" }, 400);
 
   const results = await Promise.allSettled(valid.map((f) => fetchFeed(f, env)));
+  const sources = results.map((result, index) => ({
+    url: valid[index],
+    status: result.status === "fulfilled" ? "ok" : "error",
+  }));
+  const successfulSources = results.filter((result) => result.status === "fulfilled").length;
+  if (successfulSources === 0) {
+    const res = json({ error: "all feeds failed", sources, fetched: new Date().toISOString() }, 502);
+    res.headers.set("cache-control", "no-store");
+    return res;
+  }
+
   const items: NewsItem[] = [];
   for (const r of results) if (r.status === "fulfilled") items.push(...r.value);
 
@@ -181,14 +192,14 @@ async function handleFeeds(req: Request, url: URL, env: Env, ctx: ExecutionConte
     .slice(0, limit);
 
   const format = (url.searchParams.get("format") || "json").toLowerCase();
-  const etag = await weakEtag(JSON.stringify(merged));
+  const etag = await weakEtag(JSON.stringify({ items: merged, sources }));
 
   const res =
     format === "atom" || format === "rss"
       ? renderMergedFeed(merged, format, url)
       : format === "jsonfeed"
         ? renderMergedJsonFeed(merged, url)
-        : json({ items: merged, count: merged.length, fetched: new Date().toISOString() });
+        : json({ items: merged, count: merged.length, sources, fetched: new Date().toISOString() });
   res.headers.set("cache-control", `public, max-age=${CACHE_TTL_S}`);
   res.headers.set("etag", etag);
   ctx.waitUntil(cache.put(cacheKey, res.clone()));
