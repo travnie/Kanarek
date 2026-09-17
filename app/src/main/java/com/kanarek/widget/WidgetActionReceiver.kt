@@ -4,7 +4,6 @@ import android.appwidget.AppWidgetManager
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
-import android.widget.RemoteViews
 import androidx.core.content.ContextCompat
 import com.kanarek.R
 import com.kanarek.player.PlayerActionAuth
@@ -53,7 +52,7 @@ class WidgetActionReceiver : BroadcastReceiver() {
         val manager = AppWidgetManager.getInstance(context)
         val id = intent.getIntExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, AppWidgetManager.INVALID_APPWIDGET_ID)
         if (id == AppWidgetManager.INVALID_APPWIDGET_ID) return
-        val views = RemoteViews(context.packageName, R.layout.widget)
+        val views = newsWidgetRemoteViews(context, id)
         if (forward) views.showNext(R.id.news_flipper) else views.showPrevious(R.id.news_flipper)
         manager.partiallyUpdateAppWidget(id, views)
     }
