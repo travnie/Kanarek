@@ -1,10 +1,6 @@
 package com.kanarek.data
 
 import android.content.Context
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.async
-import kotlinx.coroutines.awaitAll
-import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
@@ -108,27 +104,20 @@ internal class ReaderFeedSynchronizer(
         feeds: List<String>,
         backendUrl: String,
     ): List<ReaderFeedResult> =
-        coroutineScope {
-            feeds.map { feed ->
-                async(Dispatchers.IO) {
-                    val fetched =
-                        runCatching {
-                            repository.fetchBlockingWithStatus(
-                                feeds = listOf(feed),
-                                backendUrl = backendUrl,
-                                limit = ITEMS_PER_FEED,
-                                cache = cache,
-                                perSourceCap = 0,
-                            )
-                        }.getOrDefault(NewsFetchResult(emptyList(), successfulSources = 0))
-                    ReaderFeedResult(
-                        feed = feed,
-                        items = fetched.items,
-                        successful = fetched.successfulSources > 0,
-                    )
-                }
-            }.awaitAll()
-        }
+        repository
+            .fetchEachWithStatus(
+                feeds = feeds,
+                backendUrl = backendUrl,
+                limit = ITEMS_PER_FEED,
+                cache = cache,
+                perSourceCap = 0,
+            ).map { fetched ->
+                ReaderFeedResult(
+                    feed = fetched.feed,
+                    items = fetched.items,
+                    successful = fetched.successful,
+                )
+            }
 
     private fun emptyResult(): ReaderFeedSyncResult =
         ReaderFeedSyncResult(

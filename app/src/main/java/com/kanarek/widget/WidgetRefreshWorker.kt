@@ -16,14 +16,9 @@ import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import com.kanarek.R
 import com.kanarek.data.FeedCache
-import com.kanarek.data.NewsFetchResult
 import com.kanarek.data.NewsRepository
 import com.kanarek.data.SettingsStore
 import java.util.concurrent.TimeUnit
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.async
-import kotlinx.coroutines.awaitAll
-import kotlinx.coroutines.coroutineScope
 
 /** Fetches each active widget feed once and stores one shared snapshot. */
 class WidgetRefreshWorker(
@@ -109,27 +104,20 @@ class WidgetRefreshWorker(
         cache: FeedCache,
         backendUrl: String,
     ): List<FeedRefreshResult> =
-        coroutineScope {
-            feeds.map { feed ->
-                async(Dispatchers.IO) {
-                    val result =
-                        runCatching {
-                            repository.fetchBlockingWithStatus(
-                                feeds = listOf(feed),
-                                backendUrl = backendUrl,
-                                limit = ITEM_CAP,
-                                cache = cache,
-                                perSourceCap = 0,
-                            )
-                        }.getOrDefault(NewsFetchResult(items = emptyList(), successfulSources = 0))
-                    FeedRefreshResult(
-                        feed = feed,
-                        items = result.items,
-                        successful = result.successfulSources > 0,
-                    )
-                }
-            }.awaitAll()
-        }
+        repository
+            .fetchEachWithStatus(
+                feeds = feeds,
+                backendUrl = backendUrl,
+                limit = ITEM_CAP,
+                cache = cache,
+                perSourceCap = 0,
+            ).map { fetched ->
+                FeedRefreshResult(
+                    feed = fetched.feed,
+                    items = fetched.items,
+                    successful = fetched.successful,
+                )
+            }
 
     private fun currentConfigs(store: NewsWidgetStore): Map<Int, NewsWidgetConfig> =
         activeWidgetIds(applicationContext)

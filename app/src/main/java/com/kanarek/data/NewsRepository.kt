@@ -1,10 +1,15 @@
 package com.kanarek.data
 
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.runBlocking
-import kotlinx.coroutines.withContext
+import kotlinx.coroutines.runInterruptible
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 import org.json.JSONObject
 import java.net.HttpURLConnection
 import java.net.URL
@@ -15,6 +20,24 @@ internal data class NewsFetchResult(
     val items: List<NewsItem>,
     val successfulSources: Int,
 )
+
+internal data class SourceNewsFetchResult(
+    val feed: String,
+    val items: List<NewsItem>,
+    val successful: Boolean,
+)
+
+internal suspend fun <T, R> mapConcurrent(
+    items: List<T>,
+    parallelism: Int,
+    transform: suspend (T) -> R,
+): List<R> =
+    coroutineScope {
+        val permits = Semaphore(parallelism.coerceAtLeast(1))
+        items.map { item ->
+            async { permits.withPermit { transform(item) } }
+        }.awaitAll()
+    }
 
 /**
  * Fetches and normalizes news from one or more RSS/Atom feeds.
@@ -28,7 +51,9 @@ internal data class NewsFetchResult(
  * is sent as `If-None-Match`. A `304 Not Modified` reuses the cached body instead of
  * re-downloading it — the device-side half of the Worker's ETag support.
  */
-class NewsRepository {
+class NewsRepository(
+    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
+) {
     /** Blocking fetch — safe to call from a background thread (e.g. the widget factory). */
     fun fetchBlocking(
         feeds: List<String>,
@@ -51,9 +76,18 @@ class NewsRepository {
         limit: Int = 20,
         cache: FeedCache? = null,
         perSourceCap: Int = 0,
+    ): NewsFetchResult =
+        runBlocking {
+            fetchWithStatus(feeds, backendUrl, limit, cache, perSourceCap)
+        }
+
+    internal suspend fun fetchWithStatus(
+        feeds: List<String>,
+        backendUrl: String = "",
+        limit: Int = 20,
+        cache: FeedCache? = null,
+        perSourceCap: Int = 0,
     ): NewsFetchResult {
-        // When capping per source, over-fetch so there's enough material from each
-        // feed to diversify from before trimming back down to [limit].
         val fetchLimit =
             if (perSourceCap > 0) {
                 (limit * OVERFETCH_FACTOR).coerceAtMost(MAX_LIMIT)
@@ -62,34 +96,31 @@ class NewsRepository {
             }
         val selectedFeeds = feeds.take(MAX_FEEDS_PER_REQUEST)
         if (backendUrl.isNotBlank()) {
-            val backendResult =
-                runCatching {
-                    fetchFromBackend(
-                        backendUrl = backendUrl,
-                        feeds = selectedFeeds,
-                        limit = fetchLimit,
-                        cache = cache,
-                    )
-                }
-            if (backendResult.isSuccess) {
+            try {
+                val items =
+                    runInterruptible(ioDispatcher) {
+                        fetchFromBackend(backendUrl, selectedFeeds, fetchLimit, cache)
+                    }
                 return NewsFetchResult(
-                    items = finalize(backendResult.getOrThrow(), limit, perSourceCap),
+                    items = finalize(items, limit, perSourceCap),
                     successfulSources = selectedFeeds.size,
                 )
+            } catch (error: CancellationException) {
+                throw error
+            } catch (_: Exception) {
+                // Fall through to on-device parsing if the backend call fails.
             }
-            // Fall through to on-device parsing if the backend call fails.
         }
-        // Fan the feeds out concurrently: a single slow/stalled host would otherwise serialise
-        // the whole run (sum of every feed's timeout), leaving the reader spinning for minutes.
-        // Each feed stays isolated so partial results still render.
         val results =
-            runBlocking {
-                selectedFeeds
-                    .map { url ->
-                        async(Dispatchers.IO) {
-                            runCatching { FeedParser.parse(download(url)) }
-                        }
-                    }.awaitAll()
+            mapConcurrent(selectedFeeds, MAX_CONCURRENT_SOURCE_FETCHES) { url ->
+                try {
+                    val items = runInterruptible(ioDispatcher) { FeedParser.parse(download(url)) }
+                    Result.success(items)
+                } catch (error: CancellationException) {
+                    throw error
+                } catch (error: Exception) {
+                    Result.failure(error)
+                }
             }
         val all = results.flatMap { it.getOrDefault(emptyList()) }
         return NewsFetchResult(
@@ -97,6 +128,29 @@ class NewsRepository {
             successfulSources = results.count { it.isSuccess },
         )
     }
+
+    internal suspend fun fetchEachWithStatus(
+        feeds: List<String>,
+        backendUrl: String = "",
+        limit: Int = 20,
+        cache: FeedCache? = null,
+        perSourceCap: Int = 0,
+    ): List<SourceNewsFetchResult> =
+        mapConcurrent(feeds, MAX_CONCURRENT_SOURCE_FETCHES) { feed ->
+            val fetched =
+                try {
+                    fetchWithStatus(listOf(feed), backendUrl, limit, cache, perSourceCap)
+                } catch (error: CancellationException) {
+                    throw error
+                } catch (_: Exception) {
+                    NewsFetchResult(emptyList(), successfulSources = 0)
+                }
+            SourceNewsFetchResult(
+                feed = feed,
+                items = fetched.items,
+                successful = fetched.successfulSources > 0,
+            )
+        }
 
     /** Drop non-web links supplied by untrusted feeds, then cap/sort/trim the safe set. */
     private fun finalize(
@@ -118,21 +172,7 @@ class NewsRepository {
         limit: Int = 20,
         cache: FeedCache? = null,
         perSourceCap: Int = 0,
-    ): List<NewsItem> =
-        withContext(Dispatchers.IO) {
-            fetchBlocking(feeds, backendUrl, limit, cache, perSourceCap)
-        }
-
-    internal suspend fun fetchWithStatus(
-        feeds: List<String>,
-        backendUrl: String = "",
-        limit: Int = 20,
-        cache: FeedCache? = null,
-        perSourceCap: Int = 0,
-    ): NewsFetchResult =
-        withContext(Dispatchers.IO) {
-            fetchBlockingWithStatus(feeds, backendUrl, limit, cache, perSourceCap)
-        }
+    ): List<NewsItem> = fetchWithStatus(feeds, backendUrl, limit, cache, perSourceCap).items
 
     private fun fetchFromBackend(
         backendUrl: String,
@@ -227,6 +267,7 @@ class NewsRepository {
         private const val TIMEOUT_MS = 8_000
         internal const val MAX_FEEDS_PER_REQUEST = 12
         private const val OVERFETCH_FACTOR = 5
+        private const val MAX_CONCURRENT_SOURCE_FETCHES = 6
         private const val MAX_LIMIT = 100
         private const val MAX_BACKEND_BYTES = 2 * 1024 * 1024
         private const val MAX_FEED_BYTES = 4 * 1024 * 1024
