@@ -100,6 +100,7 @@ internal fun ReaderScreen(
     var refreshJob by remember { mutableStateOf<Job?>(null) }
     var refreshRequestId by remember { mutableIntStateOf(0) }
     var showAddSite by rememberSaveable { mutableStateOf(false) }
+    var showSourcePicker by rememberSaveable { mutableStateOf(false) }
     var navigation by
         rememberSaveable(stateSaver = ReaderNavigationStateSaver) {
             mutableStateOf(ReaderNavigationState())
@@ -331,6 +332,7 @@ internal fun ReaderScreen(
                 onBack = ::navigateBack,
                 onMenu = onMenu,
                 onRefresh = { loadPreview(savedFeeds, savedBackend) },
+                onOpenSources = { showSourcePicker = true },
                 onSettings = {
                     navigation = navigation.open(ReaderRoute.SETTINGS)
                 },
@@ -346,18 +348,6 @@ internal fun ReaderScreen(
                             .fillMaxSize()
                             .padding(padding),
                 ) {
-                    ReaderSourcePicker(
-                        sources = sourceOptions,
-                        selectedSources = filters.sources,
-                        favoriteSources = topSources,
-                        onSelectSource = { source ->
-                            filters = filters.copy(sources = setOf(source))
-                        },
-                        onClearSources = {
-                            filters = filters.copy(sources = emptySet())
-                        },
-                        onToggleFavorite = ::toggleTopSource,
-                    )
                     ReaderListPane(
                         items = shown,
                         loading = loading,
@@ -566,6 +556,24 @@ internal fun ReaderScreen(
                     showAddSite = false
                 },
                 onDismiss = { showAddSite = false },
+            )
+        }
+
+        if (showSourcePicker) {
+            ReaderSourceListDialog(
+                sources = sourceOptions,
+                selectedSources = filters.sources,
+                favoriteSources = topSources,
+                onSelectSource = { source ->
+                    filters = filters.copy(sources = setOf(source))
+                    showSourcePicker = false
+                },
+                onClearSources = {
+                    filters = filters.copy(sources = emptySet())
+                    showSourcePicker = false
+                },
+                onToggleFavorite = ::toggleTopSource,
+                onDismiss = { showSourcePicker = false },
             )
         }
     }
