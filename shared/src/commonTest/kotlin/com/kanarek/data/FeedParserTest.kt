@@ -1,11 +1,17 @@
 package com.kanarek.data
 
+import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
-class FeedParserTest {
+class FeedParserTest : FeedParserTestExecutor() {
+    private fun parseFeed(xml: String): List<NewsItem> {
+        var items = emptyList<NewsItem>()
+        runTest { items = FeedParser.parse(xml) }
+        return items
+    }
     private val rss =
         """
         <?xml version="1.0"?>
@@ -28,7 +34,7 @@ class FeedParserTest {
 
     @Test
     fun parsesRssTitleLinkSummary() {
-        val items = FeedParser.parse(rss)
+        val items = parseFeed(rss)
         assertEquals(2, items.size)
         assertEquals("First & foremost", items[0].title)
         assertEquals("https://example.com/a", items[0].link)
@@ -37,7 +43,7 @@ class FeedParserTest {
 
     @Test
     fun derivesSourceFromChannelTitle() {
-        assertEquals("Example News", FeedParser.parse(rss)[0].source)
+        assertEquals("Example News", parseFeed(rss)[0].source)
     }
 
     @Test
@@ -50,12 +56,12 @@ class FeedParserTest {
             </channel></rss>
             """.trimIndent()
 
-        assertEquals("example.com", FeedParser.parse(xml)[0].source)
+        assertEquals("example.com", parseFeed(xml)[0].source)
     }
 
     @Test
     fun parsesRfc822Date() {
-        assertEquals(1577836800000L, FeedParser.parse(rss)[0].publishedAtMillis)
+        assertEquals(1577836800000L, parseFeed(rss)[0].publishedAtMillis)
     }
 
     @Test
@@ -66,7 +72,7 @@ class FeedParserTest {
               <item><title>t</title><link>https://x/1</link><pubDate>Mon, 7 Oct 2024 12:00:00 GMT</pubDate></item>
             </channel></rss>
             """.trimIndent()
-        assertEquals(1728302400000L, FeedParser.parse(singleDigitDay)[0].publishedAtMillis)
+        assertEquals(1728302400000L, parseFeed(singleDigitDay)[0].publishedAtMillis)
     }
 
     @Test
@@ -78,7 +84,7 @@ class FeedParserTest {
                   <item><title>t</title><link>https://x/1</link><pubDate>$value</pubDate></item>
                 </channel></rss>
                 """.trimIndent()
-            return FeedParser.parse(xml)[0].publishedAtMillis
+            return parseFeed(xml)[0].publishedAtMillis
         }
 
         assertEquals(1728295200000L, date("2024-10-07T12:00:00+02:00"))
@@ -88,7 +94,7 @@ class FeedParserTest {
 
     @Test
     fun picksEnclosureImage() {
-        assertEquals("https://img.example.com/a.jpg", FeedParser.parse(rss)[0].imageUrl)
+        assertEquals("https://img.example.com/a.jpg", parseFeed(rss)[0].imageUrl)
     }
 
     @Test
@@ -100,7 +106,7 @@ class FeedParserTest {
               <item><title>ok</title><link>https://x/2</link></item>
             </channel></rss>
             """.trimIndent()
-        val items = FeedParser.parse(broken)
+        val items = parseFeed(broken)
         assertEquals(listOf("https://x/2"), items.map { it.link })
     }
 
@@ -120,7 +126,7 @@ class FeedParserTest {
               </entry>
             </feed>
             """.trimIndent()
-        val items = FeedParser.parse(atom)
+        val items = parseFeed(atom)
         assertEquals(1, items.size)
         assertEquals("Hello", items[0].title)
         assertEquals("https://atom.example/post", items[0].link)
@@ -144,13 +150,13 @@ class FeedParserTest {
             </feed>
             """.trimIndent()
 
-        assertEquals(1577923200000L, FeedParser.parse(atom)[0].publishedAtMillis)
+        assertEquals(1577923200000L, parseFeed(atom)[0].publishedAtMillis)
     }
 
     @Test
     fun returnsEmptyOnGarbageWithoutThrowing() {
-        assertTrue(FeedParser.parse("not xml at all").isEmpty())
-        assertTrue(FeedParser.parse("").isEmpty())
+        assertTrue(parseFeed("not xml at all").isEmpty())
+        assertTrue(parseFeed("").isEmpty())
     }
 
     @Test
@@ -161,7 +167,18 @@ class FeedParserTest {
               <item><title>A&#65;&#x42;</title><link>https://x/1</link></item>
             </channel></rss>
             """.trimIndent()
-        assertEquals("AAB", FeedParser.parse(xml)[0].title)
+        assertEquals("AAB", parseFeed(xml)[0].title)
+    }
+
+    @Test
+    fun decodesSupplementaryUnicodeNumericEntity() {
+        val xml =
+            """
+            <rss><channel><title>S</title>
+              <item><title>Launch &#128640;</title><link>https://x/rocket</link></item>
+            </channel></rss>
+            """.trimIndent()
+        assertEquals("Launch 🚀", parseFeed(xml)[0].title)
     }
 
     @Test
@@ -202,6 +219,6 @@ class FeedParserTest {
               <item><title>t</title><link>https://x/1</link><pubDate>not a date</pubDate></item>
             </channel></rss>
             """.trimIndent()
-        assertNull(FeedParser.parse(xml)[0].publishedAtMillis)
+        assertNull(parseFeed(xml)[0].publishedAtMillis)
     }
 }

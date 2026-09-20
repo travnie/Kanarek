@@ -26,7 +26,19 @@ class NewsRepositoryConcurrencyTest {
 
         Executors.newFixedThreadPool(2).asCoroutineDispatcher().use { dispatcher ->
             try {
-                val repository = NewsRepository(dispatcher)
+                val repository =
+                    NewsRepository(dispatcher) {
+                        listOf(
+                            NewsItem(
+                                title = "Item",
+                                link = "https://example.com/item",
+                                summary = "",
+                                imageUrl = null,
+                                source = "Test",
+                                publishedAtMillis = null,
+                            ),
+                        )
+                    }
                 val feeds = (1..10).map { "http://127.0.0.1:${server.address.port}/feed?id=$it" }
 
                 val results =

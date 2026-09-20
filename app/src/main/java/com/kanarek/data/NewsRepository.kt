@@ -53,6 +53,7 @@ internal suspend fun <T, R> mapConcurrent(
  */
 class NewsRepository(
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
+    private val parseFeed: suspend (String) -> List<NewsItem> = FeedParser::parse,
 ) {
     /** Blocking fetch — safe to call from a background thread (e.g. the widget factory). */
     fun fetchBlocking(
@@ -114,7 +115,8 @@ class NewsRepository(
         val results =
             mapConcurrent(selectedFeeds, MAX_CONCURRENT_SOURCE_FETCHES) { url ->
                 try {
-                    val items = runInterruptible(ioDispatcher) { FeedParser.parse(download(url)) }
+                    val xml = runInterruptible(ioDispatcher) { download(url) }
+                    val items = parseFeed(xml)
                     Result.success(items)
                 } catch (error: CancellationException) {
                     throw error
