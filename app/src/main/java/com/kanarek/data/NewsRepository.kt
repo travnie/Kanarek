@@ -114,7 +114,8 @@ class NewsRepository(
         val results =
             mapConcurrent(selectedFeeds, MAX_CONCURRENT_SOURCE_FETCHES) { url ->
                 try {
-                    val items = runInterruptible(ioDispatcher) { FeedParser.parse(download(url)) }
+                    val xml = runInterruptible(ioDispatcher) { download(url) }
+                    val items = FeedParser.parse(xml)
                     Result.success(items)
                 } catch (error: CancellationException) {
                     throw error

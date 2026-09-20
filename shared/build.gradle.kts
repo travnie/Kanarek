@@ -20,8 +20,16 @@ kotlin {
     iosSimulatorArm64()
 
     sourceSets {
+        commonMain.dependencies {
+            implementation(libs.rss.parser)
+        }
         commonTest.dependencies {
             implementation(kotlin("test"))
+            implementation(libs.kotlinx.coroutines.test)
+        }
+        getByName("androidHostTest").dependencies {
+            implementation(kotlin("test-junit"))
+            implementation(libs.robolectric)
         }
     }
 }

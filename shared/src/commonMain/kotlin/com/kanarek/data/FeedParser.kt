@@ -1,136 +1,66 @@
 package com.kanarek.data
 
+import com.prof18.rssparser.RssParser
+import com.prof18.rssparser.exception.RssParsingException
 import kotlin.time.Clock
 
-/**
- * Minimal RSS 2.0 / Atom parser. Regex-based, no DOM — good enough for
- * well-formed feeds and dependency-free. One source can't crash another;
- * callers wrap each feed fetch in its own try/catch.
- */
+/** Normalizes RSS, Atom and RDF feeds into Kanarek's small reader model. */
 object FeedParser {
-    fun parse(xml: String): List<NewsItem> {
-        val source = stripTags(decode(textOf(first(xml, "title")) ?: "")).trim()
-        val isAtom =
-            Regex("<feed[\\s>]", RegexOption.IGNORE_CASE).containsMatchIn(xml) &&
-                Regex("<entry[\\s>]", RegexOption.IGNORE_CASE).containsMatchIn(xml)
-        val blocks = blocksOf(xml, if (isAtom) "entry" else "item")
+    private val parser = RssParser()
 
-        return blocks.mapNotNull { block ->
-            val title = textOf(first(block, "title"))?.let { stripTags(decode(it)).trim() }
-            val link = if (isAtom) atomLink(block) else textOf(first(block, "link"))?.let { decode(it).trim() }
-            if (title.isNullOrBlank() || link.isNullOrBlank()) return@mapNotNull null
+    suspend fun parse(xml: String): List<NewsItem> {
+        if (xml.isBlank()) return emptyList()
 
-            val rawSummary =
-                textOf(first(block, if (isAtom) "summary" else "description"))
-                    ?: textOf(first(block, "content"))
-            val summary = stripTags(decode(stripTags(rawSummary ?: ""))).trim().take(280)
+        val channel =
+            try {
+                parser.parse(xml)
+            } catch (_: RssParsingException) {
+                return emptyList()
+            }
 
-            val dateStr =
-                if (isAtom) {
-                    textOf(first(block, "published"))
-                        ?: textOf(first(block, "updated"))
-                        ?: textOf(first(block, "date"))
-                } else {
-                    textOf(first(block, "pubDate"))
-                        ?: textOf(first(block, "published"))
-                        ?: textOf(first(block, "date"))
-                }
+        val source = plainText(channel.title.orEmpty())
+        return channel.items.mapNotNull { item ->
+            val title = item.title?.let(::plainText)?.takeIf(String::isNotBlank)
+                ?: return@mapNotNull null
+            val link = item.link?.trim()?.takeIf(String::isNotBlank)
+                ?: return@mapNotNull null
+            val summary = plainText(item.description ?: item.content.orEmpty()).take(280)
+            val imageUrl =
+                item.image?.trim()?.takeIf(String::isNotBlank)
+                    ?: item.rawMediaContent
+                        ?.takeIf { media ->
+                            media.medium.equals("image", ignoreCase = true) ||
+                                media.type?.startsWith("image/", ignoreCase = true) == true ||
+                                media.url?.matches(IMAGE_URL) == true
+                        }
+                        ?.url
+                        ?.trim()
+                        ?.takeIf(String::isNotBlank)
+                    ?: item.rawEnclosure
+                        ?.takeIf { enclosure ->
+                            enclosure.type?.startsWith("image/", ignoreCase = true) == true ||
+                                enclosure.url?.matches(IMAGE_URL) == true
+                        }
+                        ?.url
+                        ?.trim()
+                        ?.takeIf(String::isNotBlank)
 
             NewsItem(
                 title = title,
                 link = link,
                 summary = summary,
-                imageUrl = imageOf(block),
+                imageUrl = imageUrl,
                 source = source.ifBlank { urlHostLabel(link).orEmpty() },
-                publishedAtMillis = parseDate(dateStr),
+                publishedAtMillis = item.pubDate?.trim()?.takeIf(String::isNotEmpty)?.let(::parseFeedDate),
             )
         }
     }
 
-    private fun blocksOf(
-        xml: String,
-        tag: String,
-    ): List<String> = Regex("<$tag[\\s>][\\s\\S]*?</$tag>", RegexOption.IGNORE_CASE).findAll(xml).map { it.value }.toList()
-
-    private fun first(
-        xml: String,
-        tag: String,
-    ): String? = Regex("<$tag(?:\\s[^>]*)?>([\\s\\S]*?)</$tag>", RegexOption.IGNORE_CASE).find(xml)?.groupValues?.get(1)
-
-    private fun textOf(s: String?): String? {
-        if (s == null) return null
-        val cdata = Regex("<!\\[CDATA\\[([\\s\\S]*?)\\]\\]>").find(s)
-        return (cdata?.groupValues?.get(1) ?: s).trim()
-    }
-
-    private fun atomLink(block: String): String? {
-        val patterns =
-            listOf(
-                "<link[^>]*rel=[\"']alternate[\"'][^>]*href=[\"']([^\"']+)[\"']",
-                "<link[^>]*href=[\"']([^\"']+)[\"'][^>]*rel=[\"']alternate[\"']",
-                "<link[^>]*href=[\"']([^\"']+)[\"']",
-            )
-        for (pattern in patterns) {
-            Regex(pattern, RegexOption.IGNORE_CASE).find(block)?.let {
-                return decode(it.groupValues[1]).trim()
-            }
-        }
-        return null
-    }
-
-    private fun imageOf(block: String): String? {
-        val patterns =
-            listOf(
-                "<media:content[^>]*url=[\"']([^\"']+)[\"']",
-                "<media:thumbnail[^>]*url=[\"']([^\"']+)[\"']",
-                "<enclosure[^>]*url=[\"']([^\"']+\\.(?:jpg|jpeg|png|webp|gif)[^\"']*)[\"']",
-                "<image>[\\s\\S]*?<url>([\\s\\S]*?)</url>",
-                "<img[^>]*src=[\"']([^\"']+)[\"']",
-            )
-        for (pattern in patterns) {
-            Regex(pattern, RegexOption.IGNORE_CASE).find(block)?.let {
-                return decode(it.groupValues[1]).trim()
-            }
-        }
-        return null
-    }
-
-    private fun stripTags(s: String): String =
-        s.replace(Regex("<[^>]+>"), " ")
-            .replace(Regex("\\s+"), " ")
+    private fun plainText(value: String): String =
+        value
+            .replace(TAGS, " ")
+            .replace(WHITESPACE, " ")
             .trim()
-
-    private fun decode(s: String): String =
-        s
-            .replace("&lt;", "<")
-            .replace("&gt;", ">")
-            .replace("&quot;", "\"")
-            .replace("&#39;", "'")
-            .replace("&#039;", "'")
-            .replace("&apos;", "'")
-            .replace("&#x2F;", "/")
-            .replace("&nbsp;", " ")
-            .replace(Regex("&#(\\d+);")) {
-                runCatching {
-                    it.groupValues[1]
-                        .toInt()
-                        .toChar()
-                        .toString()
-                }.getOrDefault("")
-            }.replace(Regex("&#x([0-9a-fA-F]+);")) {
-                runCatching {
-                    it.groupValues[1]
-                        .toInt(16)
-                        .toChar()
-                        .toString()
-                }.getOrDefault("")
-            }.replace("&amp;", "&")
-
-    private fun parseDate(s: String?): Long? =
-        textOf(s)
-            ?.trim()
-            ?.takeIf(String::isNotEmpty)
-            ?.let(::parseFeedDate)
 
     /** Human-readable age for the reader UI without Android dependencies. */
     fun relativeTime(
@@ -185,6 +115,10 @@ object FeedParser {
         val last = count % 10L
         return if (last in 2L..4L && lastTwo !in 12L..14L) few else many
     }
+
+    private val TAGS = Regex("<[^>]+>")
+    private val WHITESPACE = Regex("\\s+")
+    private val IMAGE_URL = Regex("(?i)^https?://.*\\.(?:jpg|jpeg|png|webp|gif)(?:[?#].*)?$")
 }
 
 internal expect fun parseFeedDate(value: String): Long?
