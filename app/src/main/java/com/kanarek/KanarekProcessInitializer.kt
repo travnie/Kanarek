@@ -3,10 +3,10 @@ package com.kanarek
 import android.content.Context
 import androidx.startup.Initializer
 import androidx.work.WorkManagerInitializer
-import coil.Coil
-import coil.ImageLoader
-import coil.ImageLoaderFactory
-import coil.decode.SvgDecoder
+import coil3.ImageLoader
+import coil3.SingletonImageLoader
+import coil3.svg.SvgDecoder
+import coil3.network.okhttp.OkHttpNetworkFetcherFactory
 import com.kanarek.data.NewsNotificationStore
 import com.kanarek.data.SettingsStore
 import com.kanarek.notifications.NewsNotificationWorker
@@ -28,30 +28,34 @@ class KanarekProcessInitializer : Initializer<Unit> {
         // Note this covers Compose only: PlayerService decodes widget and
         // notification artwork itself with BitmapFactory, which still cannot
         // read SVG.
-        // This is the process-wide loader and it wins over an Application
-        // implementing ImageLoaderFactory, so customise it here - a factory
-        // added on an Application class later would be silently ignored.
-        Coil.setImageLoader(
-            object : ImageLoaderFactory {
-                override fun newImageLoader(): ImageLoader =
-                    ImageLoader
-                        .Builder(applicationContext)
-                        .components { add(SvgDecoder.Factory()) }
-                        .okHttpClient {
-                            OkHttpClient
-                                .Builder()
-                                .addNetworkInterceptor { chain ->
-                                    val request =
-                                        chain
-                                            .request()
-                                            .newBuilder()
-                                            .header(
-                                                "User-Agent",
-                                                "Kanarek Android (+https://github.com/travnie/kanarek)",
-                                            ).build()
-                                    chain.proceed(request)
-                                }.build()
-                        }.build()
+        // Configure the process-wide singleton here before Compose asks for it;
+        // a second factory registered later would be too late.
+        SingletonImageLoader.setSafe(
+            SingletonImageLoader.Factory {
+                ImageLoader
+                    .Builder(applicationContext)
+                    .components {
+                        add(SvgDecoder.Factory())
+                        add(
+                            OkHttpNetworkFetcherFactory(
+                                callFactory = {
+                                    OkHttpClient
+                                        .Builder()
+                                        .addNetworkInterceptor { chain ->
+                                            val request =
+                                                chain
+                                                    .request()
+                                                    .newBuilder()
+                                                    .header(
+                                                        "User-Agent",
+                                                        "Kanarek Android (+https://github.com/travnie/kanarek)",
+                                                    ).build()
+                                            chain.proceed(request)
+                                        }.build()
+                                },
+                            ),
+                        )
+                    }.build()
             },
         )
         WidgetRefreshWorker.reconcile(applicationContext)
