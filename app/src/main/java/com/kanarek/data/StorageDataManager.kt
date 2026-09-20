@@ -1,7 +1,7 @@
 package com.kanarek.data
 
 import android.content.Context
-import coil.imageLoader
+import coil3.imageLoader
 import com.kanarek.widget.WidgetImageCache
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext

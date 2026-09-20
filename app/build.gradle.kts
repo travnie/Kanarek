@@ -117,6 +117,7 @@ dependencies {
     implementation(libs.androidx.work.runtime.ktx)
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.coil.compose)
+    implementation(libs.coil.network.okhttp)
     // Station and channel logos are sometimes SVG (Wikimedia, broadcaster asset
     // pipelines). Coil has no SVG support out of the box; the decoder is
     // registered on the shared ImageLoader in KanarekProcessInitializer.

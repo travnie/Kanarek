@@ -81,7 +81,7 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
-import coil.compose.AsyncImage
+import coil3.compose.AsyncImage
 import com.kanarek.R
 import com.kanarek.cast.CastButton
 import com.kanarek.data.Favicons
