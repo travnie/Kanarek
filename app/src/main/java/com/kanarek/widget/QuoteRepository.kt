@@ -1,7 +1,6 @@
 package com.kanarek.widget
 
 import android.content.Context
-import android.net.Uri
 import com.kanarek.R
 import org.json.JSONObject
 import java.time.LocalDate
@@ -65,15 +64,3 @@ internal fun quoteForDay(
         quotes[Math.floorMod(epochDay, quotes.size.toLong()).toInt()]
     }
 
-internal fun quoteWikiquoteUrl(author: String): String =
-    if (author.isBlank()) {
-        QuoteRepository.GIST_URL
-    } else {
-        Uri.parse("https://en.wikiquote.org/w/index.php")
-            .buildUpon()
-            .appendQueryParameter("search", author)
-            .appendQueryParameter("title", "Special:Search")
-            .appendQueryParameter("go", "Go")
-            .build()
-            .toString()
-    }
