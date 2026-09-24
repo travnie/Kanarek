@@ -37,3 +37,5 @@ jobs:
           git add app/src/main/res/raw/quotes.json
           git commit -m "chore(widget): bundle quote snapshot"
           git push origin HEAD:feat/quote-widget
+
+# staged via contents API to trigger one sync run
