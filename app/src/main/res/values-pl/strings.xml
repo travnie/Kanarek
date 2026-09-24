@@ -25,6 +25,11 @@
     <string name="player_widget_label">Kanarek — odtwarzacz radia i TV</string>
     <string name="player_widget_description">Odtwarzanie w tle zapisanych stacji radiowych i kanałów IPTV, z play/pauza/dalej/wstecz.</string>
     <string name="player_widget_empty">Nie wybrano stacji</string>
+    <string name="quote_widget_label">Kanarek — cytat dnia</string>
+    <string name="quote_widget_description">Zmienialny rozmiarem cytat dnia z kolekcji dostępnej offline.</string>
+    <string name="quote_widget_empty">Brak cytatów offline</string>
+    <string name="quote_widget_preview_quote">Tutaj pojawi się cytat dnia.</string>
+    <string name="quote_widget_preview_author">— Kanarek</string>
     <string name="action_play">Odtwórz</string>
     <string name="action_pause">Pauza</string>
     <string name="action_next">Następna stacja</string>
