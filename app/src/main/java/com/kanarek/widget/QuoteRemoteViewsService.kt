@@ -3,7 +3,6 @@ package com.kanarek.widget
 import android.appwidget.AppWidgetManager
 import android.content.Context
 import android.content.Intent
-import android.net.Uri
 import android.util.TypedValue
 import android.view.View
 import android.widget.RemoteViews
@@ -64,7 +63,9 @@ private class QuoteRemoteViewsFactory(
             setTextViewTextSize(R.id.quote_author, TypedValue.COMPLEX_UNIT_SP, typography.authorSp)
             setOnClickFillInIntent(
                 R.id.quote_item_root,
-                Intent().apply { data = Uri.parse(quoteWikiquoteUrl(item.author)) },
+                Intent().apply {
+                    putExtra(QuoteRedirectActivity.EXTRA_AUTHOR, item.author)
+                },
             )
         }
     }

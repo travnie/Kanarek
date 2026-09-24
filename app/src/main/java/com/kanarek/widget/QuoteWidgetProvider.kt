@@ -47,7 +47,7 @@ class QuoteWidgetProvider : AppWidgetProvider() {
                     PendingIntent.getActivity(
                         context,
                         QUOTE_REQUEST_BASE + appWidgetId,
-                        Intent(context, ArticleRedirectActivity::class.java),
+                        Intent(context, QuoteRedirectActivity::class.java),
                         PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_MUTABLE,
                     )
                 setPendingIntentTemplate(R.id.quote_list, openTemplate)

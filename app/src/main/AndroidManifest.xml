@@ -94,6 +94,13 @@
             android:noHistory="true"
             android:theme="@android:style/Theme.Translucent.NoTitleBar" />
 
+        <activity
+            android:name=".widget.QuoteRedirectActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:noHistory="true"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar" />
+
         <!-- Radio/IPTV background playback: one ExoPlayer + MediaSession for the whole app,
              so playback and lock-screen/notification controls survive the Activity. Exported
              so the system (media notification, Android Auto, "resume playback") can bind. -->

@@ -38,6 +38,23 @@ class QuoteWidgetTest {
     }
 
     @Test
+    fun `wikiquote resolver accepts existing pages and rejects missing pages`() {
+        val found =
+            wikiquotePageUrl(
+                "Albert Einstein",
+                """{"query":{"pages":{"736":{"pageid":736,"title":"Albert Einstein"}}}}""",
+            )
+        val missing =
+            wikiquotePageUrl(
+                "Nobody",
+                """{"query":{"pages":{"-1":{"ns":0,"title":"Nobody","missing":""}}}}""",
+            )
+
+        assertEquals("https://en.wikiquote.org/wiki/Albert_Einstein", found)
+        assertEquals(null, missing)
+    }
+
+    @Test
     fun `quote parser drops blank entries`() {
         val parsed =
             parseQuotes(
