@@ -94,6 +94,13 @@
             android:noHistory="true"
             android:theme="@android:style/Theme.Translucent.NoTitleBar" />
 
+        <activity
+            android:name=".widget.QuoteRedirectActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:noHistory="true"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar" />
+
         <!-- Radio/IPTV background playback: one ExoPlayer + MediaSession for the whole app,
              so playback and lock-screen/notification controls survive the Activity. Exported
              so the system (media notification, Android Auto, "resume playback") can bind. -->
@@ -118,5 +125,24 @@
                 android:name="android.appwidget.provider"
                 android:resource="@xml/player_widget_info" />
         </receiver>
+
+        <!-- Offline daily quote widget. Android handles the deliberately inexact daily refresh;
+             the collection itself reads only the bundled quote snapshot. -->
+        <receiver
+            android:name=".widget.QuoteWidgetProvider"
+            android:exported="true"
+            android:label="@string/quote_widget_label">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/quote_widget_info" />
+        </receiver>
+
+        <service
+            android:name=".widget.QuoteRemoteViewsService"
+            android:exported="false"
+            android:permission="android.permission.BIND_REMOTEVIEWS" />
     </application>
 </manifest>

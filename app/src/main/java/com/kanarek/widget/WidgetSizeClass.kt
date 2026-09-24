@@ -73,7 +73,7 @@ internal fun playerWidgetLayout(sizeClass: WidgetSizeClass): Int =
         WidgetSizeClass.EXPANDED -> R.layout.player_widget_expanded
     }
 
-private fun Bundle.widgetWidthDp(orientation: Int): Int =
+internal fun Bundle.widgetWidthDp(orientation: Int): Int =
     if (orientation == Configuration.ORIENTATION_LANDSCAPE) {
         positiveOption(
             primary = AppWidgetManager.OPTION_APPWIDGET_MAX_WIDTH,
@@ -88,7 +88,7 @@ private fun Bundle.widgetWidthDp(orientation: Int): Int =
         )
     }
 
-private fun Bundle.widgetHeightDp(orientation: Int): Int =
+internal fun Bundle.widgetHeightDp(orientation: Int): Int =
     if (orientation == Configuration.ORIENTATION_LANDSCAPE) {
         positiveOption(
             primary = AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT,

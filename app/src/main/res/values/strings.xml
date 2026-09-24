@@ -25,6 +25,11 @@
     <string name="player_widget_label">Kanarek — radio &amp; TV player</string>
     <string name="player_widget_description">Background playback of your saved radio and IPTV stations, with play/pause/next/prev.</string>
     <string name="player_widget_empty">No station selected</string>
+    <string name="quote_widget_label">Kanarek — daily quote</string>
+    <string name="quote_widget_description">A resizable daily quote from the bundled offline collection.</string>
+    <string name="quote_widget_empty">No bundled quotes</string>
+    <string name="quote_widget_preview_quote">A daily quote appears here.</string>
+    <string name="quote_widget_preview_author">— Kanarek</string>
     <string name="action_play">Play</string>
     <string name="action_pause">Pause</string>
     <string name="action_next">Next station</string>

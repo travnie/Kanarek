@@ -1,0 +1,66 @@
+package com.kanarek.widget
+
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
+import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
+
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [34])
+class QuoteWidgetTest {
+    @Test
+    fun `daily selection advances through the bundled order without state`() {
+        val quotes =
+            listOf(
+                QuoteItem("one", "a"),
+                QuoteItem("two", "b"),
+                QuoteItem("three", "c"),
+            )
+
+        assertEquals("one", quoteForDay(quotes, 0)?.quote)
+        assertEquals("two", quoteForDay(quotes, 1)?.quote)
+        assertEquals("three", quoteForDay(quotes, 2)?.quote)
+        assertEquals("one", quoteForDay(quotes, 3)?.quote)
+    }
+
+    @Test
+    fun `typography grows with widget size and shrinks for long quotes`() {
+        val compact = quoteWidgetTypography(widthDp = 180, heightDp = 80, quoteLength = 80)
+        val expanded = quoteWidgetTypography(widthDp = 340, heightDp = 220, quoteLength = 80)
+        val long = quoteWidgetTypography(widthDp = 340, heightDp = 220, quoteLength = 500)
+
+        assertTrue(expanded.quoteSp > compact.quoteSp)
+        assertTrue(long.quoteSp < expanded.quoteSp)
+        assertTrue(long.quoteSp >= 13f)
+        assertTrue(long.authorSp >= 11f)
+    }
+
+    @Test
+    fun `wikiquote resolver accepts existing pages and rejects missing pages`() {
+        val found =
+            wikiquotePageUrl(
+                "Albert Einstein",
+                """{"query":{"pages":{"736":{"pageid":736,"title":"Albert Einstein"}}}}""",
+            )
+        val missing =
+            wikiquotePageUrl(
+                "Nobody",
+                """{"query":{"pages":{"-1":{"ns":0,"title":"Nobody","missing":""}}}}""",
+            )
+
+        assertEquals("https://en.wikiquote.org/wiki/Albert_Einstein", found)
+        assertEquals(null, missing)
+    }
+
+    @Test
+    fun `quote parser drops blank entries`() {
+        val parsed =
+            parseQuotes(
+                """{"quotes":[{"quote":"","author":"Nobody"},{"quote":"Hello","author":"World"}]}""",
+            )
+
+        assertEquals(listOf(QuoteItem("Hello", "World")), parsed)
+    }
+}
