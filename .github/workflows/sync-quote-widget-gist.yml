@@ -29,7 +29,7 @@ jobs:
       - name: Commit snapshot
         shell: bash
         run: |
-          if git diff --quiet -- app/src/main/res/raw/quotes.json; then
+          if [ -z "$(git status --porcelain -- app/src/main/res/raw/quotes.json)" ]; then
             exit 0
           fi
           git config user.name "github-actions[bot]"
