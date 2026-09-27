@@ -10,6 +10,18 @@ if [ -z "${ANDROID_HOME:-}" ] && [ -d /opt/android-sdk ] && [ -n "${CLAUDE_ENV_F
   echo 'export ANDROID_HOME=/opt/android-sdk' >> "$CLAUDE_ENV_FILE"
 fi
 
+# Android skills from the Android CLI, user-level so the repo stays clean.
+# Detached: ~3 s per skill must not delay the session; Claude Code picks new
+# skills up live because the setup script pre-creates ~/.claude/skills.
+if command -v android >/dev/null 2>&1; then
+  (
+    for skill in android-cli testing-setup edge-to-edge r8-analyzer android-intent-security android-permissions-security media3-cast-integration; do
+      [ -d "$HOME/.claude/skills/$skill" ] && continue
+      android skills add --agent=claude-code "$skill" || echo "android skill failed: $skill"
+    done
+  ) >/tmp/android-skills.log 2>&1 &
+fi
+
 git ls-files '*package-lock.json' | while read -r lock; do
   dir=$(dirname "$lock")
   [ "$dir/node_modules/.package-lock.json" -nt "$lock" ] && continue
