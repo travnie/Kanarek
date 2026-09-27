@@ -11,15 +11,15 @@ if [ -z "${ANDROID_HOME:-}" ] && [ -d /opt/android-sdk ] && [ -n "${CLAUDE_ENV_F
 fi
 
 # Android skills from the Android CLI, user-level so the repo stays clean.
-# Detached: ~3 s per skill must not delay the session; Claude Code picks new
-# skills up live because the setup script pre-creates ~/.claude/skills.
+# Installed in parallel (~11 s on a fresh VM, 0 s once present) and waited
+# for, so the first turn already has them.
 if command -v android >/dev/null 2>&1; then
-  (
-    for skill in android-cli testing-setup edge-to-edge r8-analyzer android-intent-security android-permissions-security media3-cast-integration; do
-      [ -d "$HOME/.claude/skills/$skill" ] && continue
-      android skills add --agent=claude-code "$skill" || echo "android skill failed: $skill"
-    done
-  ) >/tmp/android-skills.log 2>&1 &
+  for skill in android-cli testing-setup edge-to-edge r8-analyzer android-intent-security android-permissions-security media3-cast-integration; do
+    [ -d "$HOME/.claude/skills/$skill" ] && continue
+    android skills add --agent=claude-code "$skill" >/dev/null 2>&1 \
+      || echo "android skill failed: $skill" >&2 &
+  done
+  wait
 fi
 
 git ls-files '*package-lock.json' | while read -r lock; do
