@@ -50,15 +50,15 @@ The KMP module builds/tests Android and iOS targets, but this repository contain
 
 Prefer portable `commonMain` code when it is naturally platform-independent, but do not force Android-specific lifecycle/storage code through abstractions solely for hypothetical reuse. If a shipping iOS client is added, revisit this boundary as a product/architecture change.
 
-## 6. Release signing after organization migration is external state
+## 6. Release signing credentials are external state
 
 **Risk:** operational.
 
-`docs/DEVELOPMENT.md` notes that standalone GitHub release signing depends on repository secrets in `travnie/kanarek`. Secret values cannot be verified from repository contents.
+GitHub release signing depends on repository secrets in `travnie/kanarek`. The rolling release is currently producing signed APKs, so the migrated workflow is operational, but secret values still cannot be inspected from repository contents.
 
-**Current mitigation:** Gradle release signing is optional so unsigned/F-Droid downstream builds remain possible.
+**Current mitigation:** the rolling release exercises the signed path, while Gradle release signing remains optional so unsigned/F-Droid downstream builds are possible.
 
-**Watch for:** assuming a successful unsigned/local release build proves GitHub's signed rolling release path is configured.
+**Watch for:** credential rotation or repository migration breaking the signed release path even when unsigned/local builds still pass.
 
 ## 7. Launcher widget behavior depends partly on host launchers
 
