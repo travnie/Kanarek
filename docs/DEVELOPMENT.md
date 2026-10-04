@@ -92,7 +92,7 @@ The intended release artifacts are:
 
 `app/build.gradle.kts` is the version source of truth. Standalone release tags use `v<versionName>`, matching the migrated `v1.0.0` and `v1.0.1` tags and the F-Droid metadata. Before a new release, bump `versionName` and increase `versionCode`, merge that change to `main`, then tag the release commit with the matching `v<versionName>` tag.
 
-Release signing requires repository secrets `KEYSTORE_BASE64`, `KEYSTORE_PASSWORD`, `KEY_ALIAS`, and `KEY_PASSWORD`. The workflow is migrated, but those secret values must be configured in `travnie/kanarek` before the first standalone release; GitHub does not expose existing secret values for copying from another repository.
+Release signing uses repository secrets `KEYSTORE_BASE64`, `KEYSTORE_PASSWORD`, `KEY_ALIAS`, and `KEY_PASSWORD`. The rolling release is currently producing signed APKs, so the migrated signing path is operational; the secret values remain external GitHub state and cannot be inspected from repository contents.
 
 Further reading:
 
