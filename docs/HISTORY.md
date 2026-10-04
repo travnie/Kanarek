@@ -159,16 +159,10 @@ Worker /scrape i generatory feedseek robią to samo „strona → Atom” — r�
 (TS on-demand vs Python wsadowo). Naturalny kierunek: feedseek emituje sources.json
 (site → feed URL / selektor), które /discover czyta zanim zacznie sondować ścieżki.
 
-## Do zrobienia / na horyzoncie
+## Current horizon
 
-- Wrapper jar nie jest commitowany — CI regeneruje (lokalnie `gradle wrapper`)
-- Authenticated feeds (subskrypcje per-user) — odłożone, wymagają przechwycenia
-  endpointów XHR z zalogowanej sesji
-- Player: reordering/drag-and-drop playlisty, grupy jako sekcje/zakładki w liście,
-  Android Auto (MediaSession jest już exported, ale nie testowane w samochodzie)
-- Player: `tv.m3u8`/`radio.m3u8` ładowane teraz przez przyciski „Wczytaj przykładowe”
-  w pustym stanie (nie auto-seed). Do rozważenia: grupowanie zaimportowanych setek kanałów
-  (tv.m3u8 jest duży, sporo geo-blokad/martwych) w sekcje/zakładki po `group-title`
+- Authenticated feeds: deferred; requires identifying the authenticated session's XHR endpoints without weakening credential boundaries.
+- Player: playlist drag-and-drop/reordering and real Android Auto validation. MediaSession support exists, but in-car behavior is not yet verified.
 
 ## Logo kanałów z iptv-org (`/logos`)
 
