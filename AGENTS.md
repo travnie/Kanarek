@@ -7,7 +7,6 @@ Kanarek: Android news reader/player with a Kotlin Multiplatform core and optiona
 - `app/`: Android UI, lifecycle, persistence, WorkManager, MediaSession playback and launcher widgets.
 - `shared/`: source of truth for portable models, parsers, codecs and state transformations. Do not reintroduce portable domain logic into Android-only code.
 - `worker/`: optional edge features. Ordinary RSS/Atom reading must remain functional with no backend configured or when the Worker is unavailable.
-- Keep one maintained source of truth per concern; do not duplicate config/version values into prose.
 
 ## Platform invariants
 
@@ -17,15 +16,9 @@ Kanarek: Android news reader/player with a Kotlin Multiplatform core and optiona
 - External feeds, pages, playlists and streams are untrusted. Keep network work bounded and isolate individual source failures.
 - Never commit credentials, tokens or private deployment metadata. Non-secret Wrangler account/binding/resource IDs may stay in `worker/wrangler.jsonc` when required for reproducible deployment.
 
-## Delivery
+## Delivery and validation
 
 - Cloudflare Workers Builds owns production Worker deployment; GitHub Actions validates the Worker and must not grow a second production deploy path.
-- Build/dependency/SDK versions live in Gradle/Wrangler/package configuration. Agent docs should describe invariants, not copy version numbers.
-- Generated/build output is not maintained source.
+- Build/dependency/SDK versions live in Gradle/Wrangler/package configuration.
 - `megalinter-reports/updated_sources` contains suggestions; apply only intended fixes.
-
-## Work
-
-- Check `main`, open PRs and recent changes before overlapping work.
-- Keep one logical change per PR.
 - Validate the affected surface: shared logic with shared tests, Android behavior with Android checks, Worker behavior with Worker checks.

@@ -1,7 +1,5 @@
 # GitHub Copilot
 
-Use `AGENTS.md` as the repo-wide source of truth. Apply the nearest matching `.github/instructions/*.instructions.md` to changed files.
-
 For code review:
 
 - Flag concrete PR regressions: correctness, security/privacy, data loss, races, lifecycle/resource leaks, compatibility, and repository contract violations.
