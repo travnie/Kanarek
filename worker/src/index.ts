@@ -215,8 +215,8 @@ export function renderMergedFeed(merged: NewsItem[], format: "atom" | "rss", url
     format === "atom"
       ? generateAtomFeed({
           id: url.toString(),
-          title: "kanarek — combined feed",
-          subtitle: "Merged output of the source feeds passed to this Worker",
+          title: { value: "kanarek — combined feed" },
+          subtitle: { value: "Merged output of the source feeds passed to this Worker" },
           updated: now,
           generator: { text: "kanarek-news" },
           links: [{ href: url.origin, rel: "alternate" }, { href: url.toString(), rel: "self" }],
@@ -240,10 +240,10 @@ function atomEntry(it: NewsItem, fallbackDate: Date) {
   const byline = it.author || it.source;
   return {
     id: it.link,
-    title: it.title,
+    title: { value: it.title },
     updated: it.date ? new Date(it.date) : fallbackDate,
     links: [{ href: it.link, rel: "alternate" }],
-    summary: it.summary || undefined,
+    summary: it.summary ? { value: it.summary } : undefined,
     authors: byline ? [{ name: byline }] : undefined,
     media: it.image ? { contents: [{ url: it.image }] } : undefined,
   };
@@ -258,7 +258,7 @@ function rssItem(it: NewsItem, fallbackDate: Date) {
     description: it.summary || undefined,
     guid: { value: it.link, isPermaLink: true },
     pubDate: it.date ? new Date(it.date) : fallbackDate,
-    authors: byline ? [byline] : undefined,
+    authors: byline ? [{ name: byline }] : undefined,
     media: it.image ? { contents: [{ url: it.image }] } : undefined,
   };
 }
@@ -1023,15 +1023,15 @@ export function buildAtom(o: { title: string; pageUrl: string; selfUrl: string; 
   const updated = new Date(o.updated);
   return generateAtomFeed({
     id: o.selfUrl,
-    title: o.title,
+    title: { value: o.title },
     updated,
     links: [{ href: o.pageUrl, rel: "alternate" }, { href: o.selfUrl, rel: "self" }],
     entries: o.items.map((it) => ({
       id: it.link,
-      title: it.title,
+      title: { value: it.title },
       updated,
       links: [{ href: it.link, rel: "alternate" }],
-      summary: it.summary || undefined,
+      summary: it.summary ? { value: it.summary } : undefined,
       media: it.image ? { contents: [{ url: it.image }] } : undefined,
     })),
   });
