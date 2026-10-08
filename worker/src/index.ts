@@ -215,8 +215,8 @@ export function renderMergedFeed(merged: NewsItem[], format: "atom" | "rss", url
     format === "atom"
       ? generateAtomFeed({
           id: url.toString(),
-          title: "kanarek — combined feed",
-          subtitle: "Merged output of the source feeds passed to this Worker",
+          title: { value: "kanarek — combined feed" },
+          subtitle: { value: "Merged output of the source feeds passed to this Worker" },
           updated: now,
           generator: { text: "kanarek-news" },
           links: [{ href: url.origin, rel: "alternate" }, { href: url.toString(), rel: "self" }],
@@ -240,10 +240,10 @@ function atomEntry(it: NewsItem, fallbackDate: Date) {
   const byline = it.author || it.source;
   return {
     id: it.link,
-    title: it.title,
+    title: { value: it.title },
     updated: it.date ? new Date(it.date) : fallbackDate,
     links: [{ href: it.link, rel: "alternate" }],
-    summary: it.summary || undefined,
+    summary: it.summary ? { value: it.summary } : undefined,
     authors: byline ? [{ name: byline }] : undefined,
     media: it.image ? { contents: [{ url: it.image }] } : undefined,
   };
@@ -258,7 +258,7 @@ function rssItem(it: NewsItem, fallbackDate: Date) {
     description: it.summary || undefined,
     guid: { value: it.link, isPermaLink: true },
     pubDate: it.date ? new Date(it.date) : fallbackDate,
-    authors: byline ? [byline] : undefined,
+    authors: byline ? [{ name: byline }] : undefined,
     media: it.image ? { contents: [{ url: it.image }] } : undefined,
   };
 }
@@ -877,16 +877,16 @@ export function parseFeed(input: string): NewsItem[] {
 
 function parseFeedOrThrow(input: string): NewsItem[] {
   const feed = parseFeedSmith(input).feed as FsFeed;
-  const source = decode(stripTags(String(feed?.title || ""))).trim();
+  const source = decode(stripTags(firstStr(feed?.title))).trim();
   const entries: FsEntry[] = feed?.entries || feed?.items || [];
   const items: NewsItem[] = [];
   for (const e of entries) {
     try {
-      const title = decode(stripTags(String(e?.title || ""))).trim();
+      const title = decode(stripTags(firstStr(e?.title))).trim();
       const link = pickLink(e);
       if (!title || !link) continue;
       const summaryRaw = firstStr(e?.summary, e?.description, e?.content_text, contentStr(e?.content), e?.content_html);
-      const authorRaw = firstStr(e?.dc?.creator, e?.authors?.[0]?.name);
+      const authorRaw = firstStr(e?.dc?.creators?.[0], e?.dc?.creator, e?.authors?.[0]?.name);
       items.push({
         title,
         link: decode(link).trim(),
@@ -906,29 +906,35 @@ function parseFeedOrThrow(input: string): NewsItem[] {
 /** Minimal structural view over feedsmith's normalized object (fields we read). */
 interface FsMedia { contents?: Array<{ url?: string }>; thumbnails?: Array<{ url?: string }> }
 interface FsEntry {
-  title?: string; link?: string; url?: string; links?: Array<{ href?: string; rel?: string }>;
-  summary?: string; description?: string; content?: unknown; content_text?: string; content_html?: string;
+  title?: string | { value?: string }; link?: string; url?: string; links?: Array<{ href?: string; rel?: string }>;
+  summary?: string | { value?: string }; description?: string; content?: unknown; content_text?: string; content_html?: string;
   published?: string; pubDate?: string; updated?: string; date?: string; date_published?: string; date_modified?: string;
   image?: string; media?: FsMedia; enclosures?: Array<{ url?: string; type?: string }>;
-  /** Dublin Core namespace (v2 shape: singular fields). RSS/RDF only. */
-  dc?: { creator?: string };
+  /** Dublin Core creators from v3; v2 singular fallback. */
+  dc?: { creators?: string[]; creator?: string };
   /** Native author construct: Atom's <author><name> and JSON Feed's `authors`. Both normalize
    *  to the same { name } array shape, so one field covers both formats. */
   authors?: Array<{ name?: string }>;
 }
-interface FsFeed { title?: string; entries?: FsEntry[]; items?: FsEntry[] }
+interface FsFeed { title?: string | { value?: string }; entries?: FsEntry[]; items?: FsEntry[] }
 
 function firstStr(...vals: unknown[]): string {
-  for (const v of vals) if (typeof v === "string" && v.trim()) return v;
+  for (const v of vals) {
+    if (typeof v === "string" && v.trim()) return v;
+    if (v && typeof v === "object" && "value" in v) {
+      const value = (v as { value?: unknown }).value;
+      if (typeof value === "string" && value.trim()) return value;
+    }
+  }
   return "";
 }
-/** Atom's bare <content> parses as a string; RSS/RDF's content:encoded namespace parses as
- *  { encoded }. Handles both so content:encoded actually reaches the summary fallback chain
- *  instead of silently dropping out (the old asText() only accepted strings). */
+/** Atom content in v3 has { value }; RSS/RDF content:encoded has { encoded }. */
 function contentStr(c: unknown): string {
   if (typeof c === "string") return c;
-  if (c && typeof c === "object" && typeof (c as { encoded?: unknown }).encoded === "string") {
-    return (c as { encoded: string }).encoded;
+  if (c && typeof c === "object") {
+    const value = c as { value?: unknown; encoded?: unknown };
+    if (typeof value.value === "string") return value.value;
+    if (typeof value.encoded === "string") return value.encoded;
   }
   return "";
 }
@@ -1023,15 +1029,15 @@ export function buildAtom(o: { title: string; pageUrl: string; selfUrl: string; 
   const updated = new Date(o.updated);
   return generateAtomFeed({
     id: o.selfUrl,
-    title: o.title,
+    title: { value: o.title },
     updated,
     links: [{ href: o.pageUrl, rel: "alternate" }, { href: o.selfUrl, rel: "self" }],
     entries: o.items.map((it) => ({
       id: it.link,
-      title: it.title,
+      title: { value: it.title },
       updated,
       links: [{ href: it.link, rel: "alternate" }],
-      summary: it.summary || undefined,
+      summary: it.summary ? { value: it.summary } : undefined,
       media: it.image ? { contents: [{ url: it.image }] } : undefined,
     })),
   });
