@@ -7,6 +7,8 @@ internal data class QuoteWidgetTypography(
     val authorSp: Float,
     /** Lines the quote may use before ellipsizing, so the author line stays visible. */
     val maxLines: Int = Int.MAX_VALUE,
+    /** False at heights (down to the 60dp resize minimum) that can't hold a line plus author. */
+    val showAuthor: Boolean = true,
 )
 
 /**
@@ -33,14 +35,13 @@ internal fun quoteWidgetTypography(
         quoteSp -= STEP_SP
     }
     quoteSp = quoteSp.coerceAtLeast(MIN_QUOTE_SP)
-    return QuoteWidgetTypography(
-        quoteSp = quoteSp,
-        authorSp = authorSp(quoteSp),
-        maxLines =
-            (textHeight(quoteSp * fontScale, heightDp) / lineHeight(quoteSp * fontScale))
-                .toInt()
-                .coerceAtLeast(MIN_LINES),
-    )
+    val linesWithAuthor = (textHeight(quoteSp * fontScale, heightDp) / lineHeight(quoteSp * fontScale)).toInt()
+    if (linesWithAuthor < 1) {
+        // Quote alone: list + item padding only.
+        val lines = ((heightDp - 28f - 8f) / lineHeight(quoteSp * fontScale)).toInt()
+        return QuoteWidgetTypography(quoteSp, authorSp(quoteSp), lines.coerceAtLeast(1), showAuthor = false)
+    }
+    return QuoteWidgetTypography(quoteSp = quoteSp, authorSp = authorSp(quoteSp), maxLines = linesWithAuthor)
 }
 
 private fun authorSp(quoteSp: Float) = (quoteSp * 0.72f).coerceAtLeast(11f)
@@ -72,4 +73,3 @@ private fun lineHeight(quoteSp: Float) = quoteSp * 1.17f + 2f
 private const val MIN_QUOTE_SP = 13f
 private const val STEP_SP = 0.5f
 private const val WRAP_SLACK = 1.12f
-private const val MIN_LINES = 1

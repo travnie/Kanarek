@@ -50,6 +50,10 @@ class QuoteWidgetTest {
         assertTrue(cramped.maxLines in 1..4)
         // Minimum resize height: one line, not a forced second one that pushes the author out.
         assertEquals(1, quoteWidgetTypography(widthDp = 180, heightDp = 80, quoteLength = 150).maxLines)
+        // 60dp resize minimum: no room for quote + author, so the quote gets the space alone.
+        val tiny = quoteWidgetTypography(widthDp = 180, heightDp = 60, quoteLength = 150)
+        assertEquals(false, tiny.showAuthor)
+        assertEquals(1, tiny.maxLines)
         // Larger system font: smaller sp chosen for the same box.
         assertTrue(
             quoteWidgetTypography(320, 180, 150, fontScale = 1.3f).quoteSp < medium.quoteSp,

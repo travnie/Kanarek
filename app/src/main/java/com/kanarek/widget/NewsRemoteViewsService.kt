@@ -41,6 +41,7 @@ private class NewsRemoteViewsFactory(
     private val widgetStore = NewsWidgetStore(context)
     private var items: List<NewsItem> = emptyList()
     private var sizeClass = WidgetSizeClass.REGULAR
+    private var widthDp = DEFAULT_WIDGET_WIDTH_DP
 
     override fun onCreate() {}
 
@@ -49,14 +50,10 @@ private class NewsRemoteViewsFactory(
             items = emptyList()
             return
         }
-        sizeClass =
-            newsWidgetSizeClass(
-                options =
-                    AppWidgetManager
-                        .getInstance(context)
-                        .getAppWidgetOptions(appWidgetId),
-                orientation = context.resources.configuration.orientation,
-            )
+        val options = AppWidgetManager.getInstance(context).getAppWidgetOptions(appWidgetId)
+        val orientation = context.resources.configuration.orientation
+        sizeClass = newsWidgetSizeClass(options = options, orientation = orientation)
+        widthDp = options.widgetWidthDp(orientation)
         val global =
             NewsWidgetConfig(
                 feeds =
@@ -120,7 +117,7 @@ private class NewsRemoteViewsFactory(
             setTextViewText(R.id.item_source, item.source)
             val showSummary = sizeClass != WidgetSizeClass.COMPACT && item.summary.isNotBlank()
             setViewVisibility(R.id.item_summary, if (showSummary) View.VISIBLE else View.GONE)
-            clearButtonLane(if (showSummary) R.id.item_summary else R.id.item_title)
+            clearButtonLane(showSummary, item.summary.length)
 
             val bitmap = item.imageUrl?.let { loadBitmap(it) }
             if (bitmap != null) {
@@ -146,11 +143,14 @@ private class NewsRemoteViewsFactory(
     }
 
     /**
-     * Regular/expanded chrome puts prev/next buttons in the bottom corners. Pad the bottom-most
-     * text view sideways out of their lane instead of reserving height, which short widgets
-     * don't have.
+     * Regular/expanded chrome puts prev/next buttons in the bottom corners. Pad the text that can
+     * reach their lane sideways instead of reserving height, which short widgets don't have:
+     * the summary, plus the title when there is no summary or it fits on one line.
      */
-    private fun RemoteViews.clearButtonLane(bottomTextId: Int) {
+    private fun RemoteViews.clearButtonLane(
+        showSummary: Boolean,
+        summaryLength: Int,
+    ) {
         val blockPaddingDp =
             when (sizeClass) {
                 WidgetSizeClass.COMPACT -> return
@@ -158,11 +158,14 @@ private class NewsRemoteViewsFactory(
                 WidgetSizeClass.EXPANDED -> 18
             }
         val res = context.resources
-        val side =
-            (res.getDimensionPixelSize(R.dimen.widget_button_lane) - blockPaddingDp * res.displayMetrics.density)
-                .toInt()
-                .coerceAtLeast(0)
-        setViewPadding(bottomTextId, side, 0, side, 0)
+        val density = res.displayMetrics.density
+        val laneDp = res.getDimensionPixelSize(R.dimen.widget_button_lane) / density
+        val sideDp = (laneDp - blockPaddingDp).coerceAtLeast(0f)
+        val side = (sideDp * density).toInt()
+        // ~0.52em average glyph at the 12sp summary size.
+        val summaryCharsPerLine = (widthDp - 2 * (blockPaddingDp + sideDp)) / (12f * 0.52f)
+        if (showSummary) setViewPadding(R.id.item_summary, side, 0, side, 0)
+        if (!showSummary || summaryLength <= summaryCharsPerLine) setViewPadding(R.id.item_title, side, 0, side, 0)
     }
 
     private fun faviconUrl(link: String): String? {
