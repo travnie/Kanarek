@@ -2,9 +2,11 @@ package com.kanarek.screenshots
 
 import android.app.Application
 import android.appwidget.AppWidgetManager
+import android.content.ComponentName
 import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.Canvas
+import android.os.Bundle
 import android.os.Looper
 import android.view.View
 import android.view.ViewGroup
@@ -37,6 +39,7 @@ import com.kanarek.widget.NewsWidgetStore
 import com.kanarek.widget.PlayerWidgetProvider
 import com.kanarek.widget.PlayerWidgetState
 import com.kanarek.widget.QuoteRemoteViewsService
+import com.kanarek.widget.QuoteWidgetProvider
 import com.kanarek.widget.WidgetSizeClass
 import java.time.Duration
 import org.junit.Rule
@@ -197,6 +200,9 @@ class ScreenshotTest {
                 headlines = false,
                 intervalSeconds = 7,
             )
+        // Bind the fixture id so Robolectric keeps the per-size options set below.
+        shadowOf(AppWidgetManager.getInstance(app))
+            .bindAppWidgetId(ID, ComponentName(app, QuoteWidgetProvider::class.java))
         // NewsRemoteViewsService reconciles refresh work on bind; the app disables auto-init.
         WorkManager.initialize(app, Configuration.Builder().build())
         NewsWidgetStore(app).apply {
@@ -206,6 +212,16 @@ class ScreenshotTest {
         WidgetSizeClass.entries.forEach { sizeClass ->
             val (w, h) = size(sizeClass)
             val tag = sizeClass.name.lowercase()
+            // The collection factories size their rows from the widget's options, like on a launcher.
+            AppWidgetManager.getInstance(app).updateAppWidgetOptions(
+                ID,
+                Bundle().apply {
+                    putInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, w)
+                    putInt(AppWidgetManager.OPTION_APPWIDGET_MAX_WIDTH, w)
+                    putInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT, h)
+                    putInt(AppWidgetManager.OPTION_APPWIDGET_MAX_HEIGHT, h)
+                },
+            )
             capture(
                 PlayerWidgetProvider.buildViews(
                     context = app,
