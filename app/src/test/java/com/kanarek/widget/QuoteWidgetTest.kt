@@ -47,7 +47,13 @@ class QuoteWidgetTest {
         assertTrue(medium.quoteSp < short.quoteSp)
         assertEquals(13f, cramped.quoteSp)
         // 110dp tall: only a few lines fit above the author, not the whole quote.
-        assertTrue(cramped.maxLines in 2..4)
+        assertTrue(cramped.maxLines in 1..4)
+        // Minimum resize height: one line, not a forced second one that pushes the author out.
+        assertEquals(1, quoteWidgetTypography(widthDp = 180, heightDp = 80, quoteLength = 150).maxLines)
+        // Larger system font: smaller sp chosen for the same box.
+        assertTrue(
+            quoteWidgetTypography(320, 180, 150, fontScale = 1.3f).quoteSp < medium.quoteSp,
+        )
     }
 
     @Test

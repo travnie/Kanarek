@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- widget_chrome.xml prev/next buttons: 36dp + 6dp margin, plus 6dp air. Keeps the
-         story text of regular/expanded news items clear of them. -->
-    <dimen name="widget_item_bottom_clearance">48dp</dimen>
+    <!-- widget_chrome.xml prev/next buttons sit in the bottom corners: 36dp + 6dp margin, plus
+         2dp air, measured from the widget edge. The news item's bottom-most text line keeps
+         out of this lane horizontally, so short widgets lose no height. -->
+    <dimen name="widget_button_lane">44dp</dimen>
 </resources>

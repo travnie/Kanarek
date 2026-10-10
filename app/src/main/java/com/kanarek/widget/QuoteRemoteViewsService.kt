@@ -44,6 +44,7 @@ private class QuoteRemoteViewsFactory(
                 widthDp = options.widgetWidthDp(orientation),
                 heightDp = options.widgetHeightDp(orientation),
                 quoteLength = quote?.quote?.length ?: 0,
+                fontScale = context.resources.configuration.fontScale,
             )
     }
 

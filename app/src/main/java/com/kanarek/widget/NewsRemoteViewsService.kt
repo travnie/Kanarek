@@ -118,14 +118,9 @@ private class NewsRemoteViewsFactory(
             setTextViewText(R.id.item_title, item.title)
             setTextViewText(R.id.item_summary, item.summary)
             setTextViewText(R.id.item_source, item.source)
-            setViewVisibility(
-                R.id.item_summary,
-                if (sizeClass == WidgetSizeClass.COMPACT || item.summary.isBlank()) {
-                    View.GONE
-                } else {
-                    View.VISIBLE
-                },
-            )
+            val showSummary = sizeClass != WidgetSizeClass.COMPACT && item.summary.isNotBlank()
+            setViewVisibility(R.id.item_summary, if (showSummary) View.VISIBLE else View.GONE)
+            clearButtonLane(if (showSummary) R.id.item_summary else R.id.item_title)
 
             val bitmap = item.imageUrl?.let { loadBitmap(it) }
             if (bitmap != null) {
@@ -148,6 +143,26 @@ private class NewsRemoteViewsFactory(
             val fillIn = Intent().apply { data = Uri.parse(item.link) }
             setOnClickFillInIntent(R.id.item_root, fillIn)
         }
+    }
+
+    /**
+     * Regular/expanded chrome puts prev/next buttons in the bottom corners. Pad the bottom-most
+     * text view sideways out of their lane instead of reserving height, which short widgets
+     * don't have.
+     */
+    private fun RemoteViews.clearButtonLane(bottomTextId: Int) {
+        val blockPaddingDp =
+            when (sizeClass) {
+                WidgetSizeClass.COMPACT -> return
+                WidgetSizeClass.REGULAR -> 14
+                WidgetSizeClass.EXPANDED -> 18
+            }
+        val res = context.resources
+        val side =
+            (res.getDimensionPixelSize(R.dimen.widget_button_lane) - blockPaddingDp * res.displayMetrics.density)
+                .toInt()
+                .coerceAtLeast(0)
+        setViewPadding(bottomTextId, side, 0, side, 0)
     }
 
     private fun faviconUrl(link: String): String? {

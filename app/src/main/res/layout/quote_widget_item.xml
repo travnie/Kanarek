@@ -24,9 +24,11 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginTop="8dp"
+        android:ellipsize="end"
         android:fontFamily="sans"
         android:gravity="end"
         android:includeFontPadding="false"
+        android:maxLines="1"
         android:textColor="#E6FFFFFF"
         android:textSize="13sp"
         android:textStyle="italic" />

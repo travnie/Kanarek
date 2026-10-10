@@ -19,6 +19,7 @@ internal fun quoteWidgetTypography(
     widthDp: Int,
     heightDp: Int,
     quoteLength: Int,
+    fontScale: Float = 1f,
 ): QuoteWidgetTypography {
     val cap =
         when {
@@ -27,14 +28,18 @@ internal fun quoteWidgetTypography(
             else -> 17f
         }
     var quoteSp = cap
-    while (quoteSp > MIN_QUOTE_SP && !fits(quoteSp, widthDp, heightDp, quoteLength)) {
+    // Sizes are applied as sp, so estimate with the user's font scale.
+    while (quoteSp > MIN_QUOTE_SP && !fits(quoteSp * fontScale, widthDp, heightDp, quoteLength)) {
         quoteSp -= STEP_SP
     }
     quoteSp = quoteSp.coerceAtLeast(MIN_QUOTE_SP)
     return QuoteWidgetTypography(
         quoteSp = quoteSp,
         authorSp = authorSp(quoteSp),
-        maxLines = (textHeight(quoteSp, heightDp) / lineHeight(quoteSp)).toInt().coerceAtLeast(MIN_LINES),
+        maxLines =
+            (textHeight(quoteSp * fontScale, heightDp) / lineHeight(quoteSp * fontScale))
+                .toInt()
+                .coerceAtLeast(MIN_LINES),
     )
 }
 
@@ -55,7 +60,8 @@ private fun fits(
     return lines * lineHeight(quoteSp) <= textHeight
 }
 
-// List padding (14dp top/bottom), item padding (4dp top/bottom), author margin and line.
+// List padding (14dp top/bottom), item padding (4dp top/bottom), author margin and its single
+// line (quote_widget_item.xml keeps the author to one ellipsized line).
 private fun textHeight(
     quoteSp: Float,
     heightDp: Int,
@@ -66,4 +72,4 @@ private fun lineHeight(quoteSp: Float) = quoteSp * 1.17f + 2f
 private const val MIN_QUOTE_SP = 13f
 private const val STEP_SP = 0.5f
 private const val WRAP_SLACK = 1.12f
-private const val MIN_LINES = 2
+private const val MIN_LINES = 1
