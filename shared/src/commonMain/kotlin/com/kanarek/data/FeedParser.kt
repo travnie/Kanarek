@@ -24,7 +24,7 @@ object FeedParser {
                 ?: return@mapNotNull null
             val link = item.link?.trim()?.takeIf(String::isNotBlank)
                 ?: return@mapNotNull null
-            val summary = plainText(item.description ?: item.content.orEmpty()).take(280)
+            val summary = plainText(item.description ?: item.content.orEmpty()).takeCodePoints(280)
             val imageUrl =
                 item.image?.trim()?.takeIf(String::isNotBlank)
                     ?: item.rawMediaContent
@@ -63,6 +63,7 @@ object FeedParser {
             .replace(WHITESPACE, " ")
             .trim()
 
+    // Common references only (the full HTML table is ~2k names); unknown ones stay literal.
     internal fun decodeEntities(value: String): String =
         ENTITY.replace(value) { match ->
             val name = match.groupValues[1]
@@ -75,6 +76,13 @@ object FeedParser {
             code?.takeIf { it in 1..0x10FFFF && it !in 0xD800..0xDFFF }?.let(::codePointString)
                 ?: match.value
         }
+
+    // take(n) counts UTF-16 units and can split a surrogate pair (emoji) in half.
+    private fun String.takeCodePoints(n: Int): String {
+        if (length <= n) return this
+        val end = if (this[n - 1].isHighSurrogate()) n - 1 else n
+        return substring(0, end)
+    }
 
     private fun codePointString(code: Int): String =
         if (code < 0x10000) {
@@ -148,6 +156,10 @@ object FeedParser {
             "hellip" to 0x2026, "ndash" to 0x2013, "mdash" to 0x2014, "laquo" to 0xAB, "raquo" to 0xBB,
             "lsquo" to 0x2018, "rsquo" to 0x2019, "ldquo" to 0x201C, "rdquo" to 0x201D, "bdquo" to 0x201E,
             "copy" to 0xA9, "reg" to 0xAE, "deg" to 0xB0, "euro" to 0x20AC,
+            "trade" to 0x2122, "bull" to 0x2022, "middot" to 0xB7, "times" to 0xD7, "shy" to 0xAD,
+            "sbquo" to 0x201A, "prime" to 0x2032, "pound" to 0xA3, "sect" to 0xA7, "para" to 0xB6,
+            "eacute" to 0xE9, "egrave" to 0xE8, "aacute" to 0xE1, "oacute" to 0xF3, "uuml" to 0xFC,
+            "ouml" to 0xF6, "auml" to 0xE4, "szlig" to 0xDF, "ccedil" to 0xE7, "ntilde" to 0xF1,
         )
     private val IMAGE_URL = Regex("(?i)^https?://.*\\.(?:jpg|jpeg|png|webp|gif)(?:[?#].*)?$")
 }

@@ -56,6 +56,19 @@ class FeedParserTest : FeedParserTestExecutor() {
     }
 
     @Test
+    fun summaryCutDoesNotSplitEmoji() {
+        val text = "a".repeat(279) + "\uD83D\uDE00tail"
+        val xml =
+            """
+            <rss><channel><title>G</title><item>
+              <title>T</title><link>https://example.com/e</link><description>$text</description>
+            </item></channel></rss>
+            """.trimIndent()
+
+        assertEquals("a".repeat(279), parseFeed(xml)[0].summary)
+    }
+
+    @Test
     fun derivesSourceFromChannelTitle() {
         assertEquals("Example News", parseFeed(rss)[0].source)
     }
