@@ -54,6 +54,11 @@ class QuoteWidgetTest {
         val tiny = quoteWidgetTypography(widthDp = 180, heightDp = 60, quoteLength = 150)
         assertEquals(false, tiny.showAuthor)
         assertEquals(1, tiny.maxLines)
+        // Blank author: its row isn't reserved, so the quote gets more lines.
+        assertTrue(
+            quoteWidgetTypography(180, 80, 150, hasAuthor = false).maxLines >
+                quoteWidgetTypography(180, 80, 150).maxLines,
+        )
         // Larger system font: smaller sp chosen for the same box.
         assertTrue(
             quoteWidgetTypography(320, 180, 150, fontScale = 1.3f).quoteSp < medium.quoteSp,
