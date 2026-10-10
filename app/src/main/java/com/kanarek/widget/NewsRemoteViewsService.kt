@@ -6,6 +6,8 @@ import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.net.Uri
+import android.text.TextPaint
+import android.util.TypedValue
 import android.view.View
 import android.widget.RemoteViews
 import android.widget.RemoteViewsService
@@ -117,7 +119,7 @@ private class NewsRemoteViewsFactory(
             setTextViewText(R.id.item_source, item.source)
             val showSummary = sizeClass != WidgetSizeClass.COMPACT && item.summary.isNotBlank()
             setViewVisibility(R.id.item_summary, if (showSummary) View.VISIBLE else View.GONE)
-            clearButtonLane(showSummary, item.summary.length)
+            clearButtonLane(showSummary, item.summary)
 
             val bitmap = item.imageUrl?.let { loadBitmap(it) }
             if (bitmap != null) {
@@ -149,7 +151,7 @@ private class NewsRemoteViewsFactory(
      */
     private fun RemoteViews.clearButtonLane(
         showSummary: Boolean,
-        summaryLength: Int,
+        summary: String,
     ) {
         val blockPaddingDp =
             when (sizeClass) {
@@ -162,10 +164,16 @@ private class NewsRemoteViewsFactory(
         val laneDp = res.getDimensionPixelSize(R.dimen.widget_button_lane) / density
         val sideDp = (laneDp - blockPaddingDp).coerceAtLeast(0f)
         val side = (sideDp * density).toInt()
-        // ~0.52em average glyph at the 12sp summary size.
-        val summaryCharsPerLine = (widthDp - 2 * (blockPaddingDp + sideDp)) / (12f * 0.52f)
+        val summaryWidthPx = (widthDp - 2 * (blockPaddingDp + sideDp)) * density
+        // Measure with the summary's real 12sp paint: a one-line summary leaves the title's last
+        // line inside the lane too.
+        val summaryPaint =
+            TextPaint().apply {
+                textSize = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_SP, 12f, res.displayMetrics)
+            }
+        val oneLineSummary = summaryPaint.measureText(summary) <= summaryWidthPx
         if (showSummary) setViewPadding(R.id.item_summary, side, 0, side, 0)
-        if (!showSummary || summaryLength <= summaryCharsPerLine) setViewPadding(R.id.item_title, side, 0, side, 0)
+        if (!showSummary || oneLineSummary) setViewPadding(R.id.item_title, side, 0, side, 0)
     }
 
     private fun faviconUrl(link: String): String? {
