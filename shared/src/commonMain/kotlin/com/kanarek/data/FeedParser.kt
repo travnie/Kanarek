@@ -56,11 +56,34 @@ object FeedParser {
         }
     }
 
+    // Entities after tag stripping: Google News & co. escape their HTML once more, so after
+    // the XML layer the text still carries "&nbsp;" and friends.
     private fun plainText(value: String): String =
-        value
-            .replace(TAGS, " ")
+        decodeEntities(value.replace(TAGS, " "))
             .replace(WHITESPACE, " ")
             .trim()
+
+    internal fun decodeEntities(value: String): String =
+        ENTITY.replace(value) { match ->
+            val name = match.groupValues[1]
+            val code =
+                when {
+                    name.startsWith("#x", ignoreCase = true) -> name.drop(2).toIntOrNull(16)
+                    name.startsWith("#") -> name.drop(1).toIntOrNull()
+                    else -> NAMED_ENTITIES[name]
+                }
+            code?.takeIf { it in 1..0x10FFFF && it !in 0xD800..0xDFFF }?.let(::codePointString)
+                ?: match.value
+        }
+
+    private fun codePointString(code: Int): String =
+        if (code < 0x10000) {
+            Char(code).toString()
+        } else {
+            val offset = code - 0x10000
+            charArrayOf(Char(0xD800 + (offset shr 10)), Char(0xDC00 + (offset and 0x3FF)))
+                .concatToString()
+        }
 
     /** Human-readable age for the reader UI without Android dependencies. */
     fun relativeTime(
@@ -117,7 +140,15 @@ object FeedParser {
     }
 
     private val TAGS = Regex("<[^>]+>")
-    private val WHITESPACE = Regex("\\s+")
+    private val WHITESPACE = Regex("[\\s\u00A0]+") // incl. decoded &nbsp;
+    private val ENTITY = Regex("&(#[0-9]{1,7}|#[xX][0-9a-fA-F]{1,6}|[a-zA-Z]{2,8});")
+    private val NAMED_ENTITIES =
+        mapOf(
+            "nbsp" to 0xA0, "amp" to 0x26, "lt" to 0x3C, "gt" to 0x3E, "quot" to 0x22, "apos" to 0x27,
+            "hellip" to 0x2026, "ndash" to 0x2013, "mdash" to 0x2014, "laquo" to 0xAB, "raquo" to 0xBB,
+            "lsquo" to 0x2018, "rsquo" to 0x2019, "ldquo" to 0x201C, "rdquo" to 0x201D, "bdquo" to 0x201E,
+            "copy" to 0xA9, "reg" to 0xAE, "deg" to 0xB0, "euro" to 0x20AC,
+        )
     private val IMAGE_URL = Regex("(?i)^https?://.*\\.(?:jpg|jpeg|png|webp|gif)(?:[?#].*)?$")
 }
 
