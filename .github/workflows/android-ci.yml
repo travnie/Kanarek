@@ -80,7 +80,8 @@ jobs:
 
   emulator-smoke:
     # Real-device check the JVM screenshots can't give: install the debug APK (-g: no permission
-    # dialog over the screenshot), cold-start both pages (player via the widget deep-link extra) on an Android 16 emulator, fail on a crash, keep screenshots + logcat.
+    # dialog over the screenshot), cold-start both pages (player via the widget deep-link
+    # extra) on an Android 16 emulator, fail on a crash, keep screenshots + logcat.
     name: Emulator smoke
     needs: build
     runs-on: ubuntu-latest
