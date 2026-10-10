@@ -120,7 +120,9 @@ jobs:
         # pidof above already fails if the process died (Java or native). Here: no crash record
         # for com.kanarek, and the cold-start deep-link left the player's top-bar title on screen.
         run: |
-          ! grep -E "^(--------- beginning of crash|.*(FATAL EXCEPTION|Fatal signal))" -A3 out/logcat.txt | grep -q com.kanarek
+          if grep -E "^(--------- beginning of crash|.*(FATAL EXCEPTION|Fatal signal))" -A3 out/logcat.txt | grep -q com.kanarek; then
+            echo "::error::com.kanarek crashed, see logcat.txt"; exit 1
+          fi
           python3 - <<'PY'
           import re, xml.etree.ElementTree as ET
           nodes = ET.parse("out/player-ui.xml").iter("node")
