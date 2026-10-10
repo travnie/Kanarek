@@ -79,8 +79,8 @@ jobs:
           if-no-files-found: warn
 
   emulator-smoke:
-    # Real-device check the JVM screenshots can't give: install the debug APK, cold-start both
-    # pages on an Android 16 emulator, fail on a crash, keep screenshots + logcat.
+    # Real-device check the JVM screenshots can't give: install the debug APK (-g: no permission
+    # dialog over the screenshot), cold-start both pages (player via the widget deep-link extra) on an Android 16 emulator, fail on a crash, keep screenshots + logcat.
     name: Emulator smoke
     needs: build
     runs-on: ubuntu-latest
@@ -100,11 +100,12 @@ jobs:
           avd-name: kanarek-ci
           script: |
             mkdir -p out
-            adb install -r "$(ls apk/play/debug/*.apk | head -1)"
+            adb install -r -g "$(ls apk/play/debug/*.apk | head -1)"
             adb logcat -c
             adb shell am start -W -n com.kanarek/.HomeActivity
             sleep 8
             adb exec-out screencap -p > out/reader.png
+            adb shell am force-stop com.kanarek
             adb shell am start -W -n com.kanarek/.HomeActivity --ei com.kanarek.extra.PAGE 1
             sleep 5
             adb exec-out screencap -p > out/player.png
