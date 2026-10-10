@@ -58,7 +58,9 @@ jobs:
         # sources); fossDebug is assembled too so a GMS reference leaking into main/foss
         # sources fails CI immediately. Shared common tests run on the Android host target.
         # roborazzi.test.record: the unit-test run also writes JVM screenshots (ScreenshotTest).
-        run: ./gradlew assemblePlayDebug assembleFossDebug testPlayDebugUnitTest :shared:testAndroidHostTest lintPlayDebug -Proborazzi.test.record=true --stacktrace
+        run: |
+          ./gradlew assemblePlayDebug assembleFossDebug testPlayDebugUnitTest \
+            :shared:testAndroidHostTest lintPlayDebug -Proborazzi.test.record=true --stacktrace
 
       - name: Upload debug APK
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
@@ -97,7 +99,17 @@ jobs:
         with:
           avd-name: kanarek-ci
           script: |
-            mkdir -p out && adb install -r "$(ls apk/play/debug/*.apk | head -1)" && adb logcat -c && adb shell am start -W -n com.kanarek/.HomeActivity && sleep 8 && adb exec-out screencap -p > out/reader.png && adb shell am start -W -n com.kanarek/.HomeActivity --ei com.kanarek.extra.PAGE 1 && sleep 5 && adb exec-out screencap -p > out/player.png && adb logcat -d > out/logcat.txt && ! grep -q "FATAL EXCEPTION" out/logcat.txt
+            mkdir -p out
+            adb install -r "$(ls apk/play/debug/*.apk | head -1)"
+            adb logcat -c
+            adb shell am start -W -n com.kanarek/.HomeActivity
+            sleep 8
+            adb exec-out screencap -p > out/reader.png
+            adb shell am start -W -n com.kanarek/.HomeActivity --ei com.kanarek.extra.PAGE 1
+            sleep 5
+            adb exec-out screencap -p > out/player.png
+            adb logcat -d > out/logcat.txt
+            ! grep -q "FATAL EXCEPTION" out/logcat.txt
 
       - name: Upload emulator screenshots
         if: always()
