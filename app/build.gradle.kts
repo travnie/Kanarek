@@ -3,6 +3,7 @@ import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
+    alias(libs.plugins.roborazzi)
 }
 
 android {
@@ -141,4 +142,11 @@ dependencies {
 
     testImplementation(libs.junit)
     testImplementation(libs.robolectric)
+
+    // JVM screenshots (Roborazzi on Robolectric): `./gradlew :app:recordRoborazziPlayDebug`
+    // writes PNGs to app/build/outputs/roborazzi without an emulator.
+    testImplementation(libs.roborazzi)
+    testImplementation(platform(libs.androidx.compose.bom))
+    testImplementation(libs.androidx.ui.test.junit4)
+    debugImplementation(libs.androidx.ui.test.manifest)
 }

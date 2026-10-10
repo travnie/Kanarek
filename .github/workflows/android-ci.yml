@@ -57,13 +57,87 @@ jobs:
         # plain testDebugUnitTest/lintDebug. Unit tests and lint run on play (superset of
         # sources); fossDebug is assembled too so a GMS reference leaking into main/foss
         # sources fails CI immediately. Shared common tests run on the Android host target.
-        run: ./gradlew assemblePlayDebug assembleFossDebug testPlayDebugUnitTest :shared:testAndroidHostTest lintPlayDebug --stacktrace
+        # roborazzi.test.record: the unit-test run also writes JVM screenshots (ScreenshotTest).
+        run: |
+          ./gradlew assemblePlayDebug assembleFossDebug testPlayDebugUnitTest \
+            :shared:testAndroidHostTest lintPlayDebug -Proborazzi.test.record=true --stacktrace
 
       - name: Upload debug APK
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: kanarek-debug-apk
           path: app/build/outputs/apk/*/debug/*.apk
+          if-no-files-found: warn
+
+      - name: Upload JVM screenshots
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: kanarek-screenshots-jvm
+          path: app/build/outputs/roborazzi/*.png
+          retention-days: 14
+          if-no-files-found: warn
+
+  emulator-smoke:
+    # Real-device check the JVM screenshots can't give: install the debug APK (-g: no permission
+    # dialog over the screenshot), cold-start both pages (player via the widget deep-link
+    # extra) on an Android 16 emulator, fail on a crash, keep screenshots + logcat.
+    name: Emulator smoke
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: kanarek-debug-apk
+          path: apk
+
+      - name: Launch on emulator
+        # aistee's composite action: KVM + cached AVD snapshot.
+        uses: travnie/aistee/.github/actions/run-android-emulator@0d4aa44faf46fb716738b170452410fcc2371ede
+        with:
+          avd-name: kanarek-ci
+          script: |
+            mkdir -p out
+            adb install -r -g "$(ls apk/play/debug/*.apk | head -1)"
+            adb logcat -c
+            adb shell am start -W -n com.kanarek/.HomeActivity
+            sleep 8
+            adb exec-out screencap -p > out/reader.png
+            adb shell pidof com.kanarek
+            adb shell am force-stop com.kanarek
+            adb shell am start -W -n com.kanarek/.HomeActivity --ei com.kanarek.extra.PAGE 1
+            sleep 5
+            adb exec-out screencap -p > out/player.png
+            adb shell uiautomator dump /sdcard/player-ui.xml
+            adb pull /sdcard/player-ui.xml out/player-ui.xml
+            adb shell pidof com.kanarek
+            adb logcat -d > out/logcat.txt
+
+      - name: Check player deep-link and crashes
+        # pidof above already fails if the process died (Java or native). Here: no crash record
+        # for com.kanarek, and the cold-start deep-link left the player's top-bar title on screen.
+        run: |
+          if grep -E "^(--------- beginning of crash|.*(FATAL EXCEPTION|Fatal signal))" -A3 out/logcat.txt | grep -q com.kanarek; then
+            echo "::error::com.kanarek crashed, see logcat.txt"; exit 1
+          fi
+          python3 - <<'PY'
+          import re, xml.etree.ElementTree as ET
+          nodes = ET.parse("out/player-ui.xml").iter("node")
+          tops = [n for n in nodes if n.get("text") == "Radio & TV"
+                  and int(re.findall(r"\d+", n.get("bounds"))[1]) < 400]
+          assert tops, "player page not shown after cold-start deep-link"
+          PY
+
+      - name: Upload emulator screenshots
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: kanarek-screenshots-emulator
+          path: out/
+          retention-days: 14
           if-no-files-found: warn
 
 
