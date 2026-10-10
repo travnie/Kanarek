@@ -99,6 +99,7 @@ jobs:
         uses: travnie/aistee/.github/actions/run-android-emulator@0d4aa44faf46fb716738b170452410fcc2371ede
         with:
           avd-name: kanarek-ci
+          # uiautomator dump and logcat -d flake on a fresh emulator (null root node, exit 255): retry.
           script: |
             mkdir -p out
             adb install -r -g "$(ls apk/play/debug/*.apk | head -1)"
@@ -111,10 +112,10 @@ jobs:
             adb shell am start -W -n com.kanarek/.HomeActivity --ei com.kanarek.extra.PAGE 1
             sleep 5
             adb exec-out screencap -p > out/player.png
-            adb shell uiautomator dump /sdcard/player-ui.xml
+            for i in 1 2 3; do adb shell uiautomator dump /sdcard/player-ui.xml | grep -q dumped && break; sleep 3; done
             adb pull /sdcard/player-ui.xml out/player-ui.xml
             adb shell pidof com.kanarek
-            adb logcat -d > out/logcat.txt
+            adb logcat -d > out/logcat.txt || { sleep 3; adb logcat -d > out/logcat.txt; }
 
       - name: Check player deep-link and crashes
         # pidof above already fails if the process died (Java or native). Here: no crash record
