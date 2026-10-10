@@ -106,12 +106,28 @@ jobs:
             adb shell am start -W -n com.kanarek/.HomeActivity
             sleep 8
             adb exec-out screencap -p > out/reader.png
+            adb shell pidof com.kanarek
             adb shell am force-stop com.kanarek
             adb shell am start -W -n com.kanarek/.HomeActivity --ei com.kanarek.extra.PAGE 1
             sleep 5
             adb exec-out screencap -p > out/player.png
+            adb shell uiautomator dump /sdcard/player-ui.xml
+            adb pull /sdcard/player-ui.xml out/player-ui.xml
+            adb shell pidof com.kanarek
             adb logcat -d > out/logcat.txt
-            ! grep -q "FATAL EXCEPTION" out/logcat.txt
+
+      - name: Check player deep-link and crashes
+        # pidof above already fails if the process died (Java or native). Here: no crash record
+        # for com.kanarek, and the cold-start deep-link left the player's top-bar title on screen.
+        run: |
+          ! grep -E "^(--------- beginning of crash|.*(FATAL EXCEPTION|Fatal signal))" -A3 out/logcat.txt | grep -q com.kanarek
+          python3 - <<'PY'
+          import re, xml.etree.ElementTree as ET
+          nodes = ET.parse("out/player-ui.xml").iter("node")
+          tops = [n for n in nodes if n.get("text") == "Radio & TV"
+                  and int(re.findall(r"\d+", n.get("bounds"))[1]) < 400]
+          assert tops, "player page not shown after cold-start deep-link"
+          PY
 
       - name: Upload emulator screenshots
         if: always()
