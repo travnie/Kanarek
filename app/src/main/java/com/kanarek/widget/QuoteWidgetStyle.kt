@@ -1,32 +1,69 @@
 package com.kanarek.widget
 
+import kotlin.math.ceil
+
 internal data class QuoteWidgetTypography(
     val quoteSp: Float,
     val authorSp: Float,
+    /** Lines the quote may use before ellipsizing, so the author line stays visible. */
+    val maxLines: Int = Int.MAX_VALUE,
 )
 
+/**
+ * Largest quote size (from a size-class cap down to [MIN_QUOTE_SP]) whose estimated wrapped
+ * height still fits the widget with the author line, so the author isn't pushed off-screen.
+ * Estimate only: average glyph width ~0.52em plus word-wrap slack. At the floor, a quote too
+ * long for the widget is ellipsized to the lines that fit; tapping opens the full source.
+ */
 internal fun quoteWidgetTypography(
     widthDp: Int,
     heightDp: Int,
     quoteLength: Int,
 ): QuoteWidgetTypography {
-    val base =
+    val cap =
         when {
             widthDp >= 300 && heightDp >= 180 -> 24f
             widthDp >= 220 && heightDp >= 100 -> 20f
             else -> 17f
         }
-    val penalty =
-        when {
-            quoteLength > 420 -> 7f
-            quoteLength > 280 -> 5f
-            quoteLength > 180 -> 3f
-            quoteLength > 110 -> 1.5f
-            else -> 0f
-        }
-    val quoteSp = (base - penalty).coerceAtLeast(13f)
+    var quoteSp = cap
+    while (quoteSp > MIN_QUOTE_SP && !fits(quoteSp, widthDp, heightDp, quoteLength)) {
+        quoteSp -= STEP_SP
+    }
+    quoteSp = quoteSp.coerceAtLeast(MIN_QUOTE_SP)
     return QuoteWidgetTypography(
         quoteSp = quoteSp,
-        authorSp = (quoteSp * 0.72f).coerceAtLeast(11f),
+        authorSp = authorSp(quoteSp),
+        maxLines = (textHeight(quoteSp, heightDp) / lineHeight(quoteSp)).toInt().coerceAtLeast(MIN_LINES),
     )
 }
+
+private fun authorSp(quoteSp: Float) = (quoteSp * 0.72f).coerceAtLeast(11f)
+
+private fun fits(
+    quoteSp: Float,
+    widthDp: Int,
+    heightDp: Int,
+    quoteLength: Int,
+): Boolean {
+    // quote_widget.xml list padding is 18dp per side.
+    val textWidth = widthDp - 36f
+    val textHeight = textHeight(quoteSp, heightDp)
+    if (textWidth <= 0f || textHeight <= 0f) return false
+    val charsPerLine = textWidth / (quoteSp * 0.52f)
+    val lines = ceil(quoteLength * WRAP_SLACK / charsPerLine)
+    return lines * lineHeight(quoteSp) <= textHeight
+}
+
+// List padding (14dp top/bottom), item padding (4dp top/bottom), author margin and line.
+private fun textHeight(
+    quoteSp: Float,
+    heightDp: Int,
+) = heightDp - 28f - 8f - 8f - authorSp(quoteSp) * 1.3f
+
+private fun lineHeight(quoteSp: Float) = quoteSp * 1.17f + 2f
+
+private const val MIN_QUOTE_SP = 13f
+private const val STEP_SP = 0.5f
+private const val WRAP_SLACK = 1.12f
+private const val MIN_LINES = 2

@@ -25,7 +25,10 @@
         android:layout_height="wrap_content"
         android:layout_gravity="bottom"
         android:orientation="vertical"
-        android:padding="18dp">
+        android:paddingStart="18dp"
+        android:paddingTop="18dp"
+        android:paddingEnd="18dp"
+        android:paddingBottom="@dimen/widget_item_bottom_clearance">
 
         <LinearLayout
             android:layout_width="wrap_content"

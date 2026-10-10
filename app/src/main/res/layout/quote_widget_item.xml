@@ -12,6 +12,7 @@
         android:id="@+id/quote_text"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        android:ellipsize="end"
         android:fontFamily="sans"
         android:includeFontPadding="false"
         android:lineSpacingExtra="2dp"

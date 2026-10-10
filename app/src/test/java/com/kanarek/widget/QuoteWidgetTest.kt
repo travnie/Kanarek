@@ -38,6 +38,19 @@ class QuoteWidgetTest {
     }
 
     @Test
+    fun `quote shrinks to fit, then ellipsizes so the author stays visible`() {
+        val short = quoteWidgetTypography(widthDp = 320, heightDp = 180, quoteLength = 40)
+        val medium = quoteWidgetTypography(widthDp = 320, heightDp = 180, quoteLength = 150)
+        val cramped = quoteWidgetTypography(widthDp = 180, heightDp = 110, quoteLength = 150)
+
+        assertEquals(24f, short.quoteSp)
+        assertTrue(medium.quoteSp < short.quoteSp)
+        assertEquals(13f, cramped.quoteSp)
+        // 110dp tall: only a few lines fit above the author, not the whole quote.
+        assertTrue(cramped.maxLines in 2..4)
+    }
+
+    @Test
     fun `wikiquote resolver accepts existing pages and rejects missing pages`() {
         val found =
             wikiquotePageUrl(

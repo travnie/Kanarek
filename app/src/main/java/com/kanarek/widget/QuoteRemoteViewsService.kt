@@ -61,6 +61,7 @@ private class QuoteRemoteViewsFactory(
             setViewVisibility(R.id.quote_author, if (item.author.isBlank()) View.GONE else View.VISIBLE)
             setTextViewTextSize(R.id.quote_text, TypedValue.COMPLEX_UNIT_SP, typography.quoteSp)
             setTextViewTextSize(R.id.quote_author, TypedValue.COMPLEX_UNIT_SP, typography.authorSp)
+            setInt(R.id.quote_text, "setMaxLines", typography.maxLines)
             setOnClickFillInIntent(
                 R.id.quote_item_root,
                 Intent().apply {

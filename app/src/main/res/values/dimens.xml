@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- widget_chrome.xml prev/next buttons: 36dp + 6dp margin, plus 6dp air. Keeps the
+         story text of regular/expanded news items clear of them. -->
+    <dimen name="widget_item_bottom_clearance">48dp</dimen>
+</resources>
