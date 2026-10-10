@@ -73,7 +73,11 @@ object FeedParser {
                     name.startsWith("#") -> name.drop(1).toIntOrNull()
                     else -> NAMED_ENTITIES[name]
                 }
-            code?.takeIf { it in 1..0x10FFFF && it !in 0xD800..0xDFFF }?.let(::codePointString)
+            // HTML maps numeric references in 0x80..0x9F through Windows-1252 (&#146; is ’).
+            code
+                ?.let { if (it in 0x80..0x9F) WINDOWS_1252_C1[it - 0x80] else it }
+                ?.takeIf { it in 1..0x10FFFF && it !in 0xD800..0xDFFF }
+                ?.let(::codePointString)
                 ?: match.value
         }
 
@@ -150,6 +154,13 @@ object FeedParser {
     private val TAGS = Regex("<[^>]+>")
     private val WHITESPACE = Regex("[\\s\u00A0]+") // incl. decoded &nbsp;
     private val ENTITY = Regex("&(#[0-9]{1,7}|#[xX][0-9a-fA-F]{1,6}|[a-zA-Z]{2,8});")
+    private val WINDOWS_1252_C1 =
+        intArrayOf(
+            0x20AC, 0x81, 0x201A, 0x192, 0x201E, 0x2026, 0x2020, 0x2021,
+            0x2C6, 0x2030, 0x160, 0x2039, 0x152, 0x8D, 0x17D, 0x8F,
+            0x90, 0x2018, 0x2019, 0x201C, 0x201D, 0x2022, 0x2013, 0x2014,
+            0x2DC, 0x2122, 0x161, 0x203A, 0x153, 0x9D, 0x17E, 0x178,
+        )
     private val NAMED_ENTITIES =
         mapOf(
             "nbsp" to 0xA0, "amp" to 0x26, "lt" to 0x3C, "gt" to 0x3E, "quot" to 0x22, "apos" to 0x27,

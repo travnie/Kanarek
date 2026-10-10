@@ -48,11 +48,11 @@ class FeedParserTest : FeedParserTestExecutor() {
             """
             <rss><channel><title>G</title><item>
               <title>T</title><link>https://example.com/g</link>
-              <description>&lt;a href="https://x"&gt;Headline&lt;/a&gt;&amp;nbsp;&amp;nbsp;&lt;font&gt;WP Tech&lt;/font&gt; &amp;#8222;cytat&amp;#x201D; &amp;bogus; &amp;#128512;</description>
+              <description>&lt;a href="https://x"&gt;Headline&lt;/a&gt;&amp;nbsp;&amp;nbsp;&lt;font&gt;WP Tech&lt;/font&gt; &amp;#8222;cytat&amp;#x201D; &amp;bogus; &amp;#128512; it&amp;#146;s &amp;#128;5</description>
             </item></channel></rss>
             """.trimIndent()
 
-        assertEquals("Headline WP Tech \u201Ecytat\u201D &bogus; \uD83D\uDE00", parseFeed(xml)[0].summary)
+        assertEquals("Headline WP Tech \u201Ecytat\u201D &bogus; \uD83D\uDE00 it\u2019s \u20AC5", parseFeed(xml)[0].summary)
     }
 
     @Test
