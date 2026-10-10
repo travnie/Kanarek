@@ -6,6 +6,8 @@ import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.net.Uri
+import android.text.TextPaint
+import android.util.TypedValue
 import android.view.View
 import android.widget.RemoteViews
 import android.widget.RemoteViewsService
@@ -41,6 +43,7 @@ private class NewsRemoteViewsFactory(
     private val widgetStore = NewsWidgetStore(context)
     private var items: List<NewsItem> = emptyList()
     private var sizeClass = WidgetSizeClass.REGULAR
+    private var widthDp = DEFAULT_WIDGET_WIDTH_DP
 
     override fun onCreate() {}
 
@@ -49,14 +52,10 @@ private class NewsRemoteViewsFactory(
             items = emptyList()
             return
         }
-        sizeClass =
-            newsWidgetSizeClass(
-                options =
-                    AppWidgetManager
-                        .getInstance(context)
-                        .getAppWidgetOptions(appWidgetId),
-                orientation = context.resources.configuration.orientation,
-            )
+        val options = AppWidgetManager.getInstance(context).getAppWidgetOptions(appWidgetId)
+        val orientation = context.resources.configuration.orientation
+        sizeClass = newsWidgetSizeClass(options = options, orientation = orientation)
+        widthDp = options.widgetWidthDp(orientation)
         val global =
             NewsWidgetConfig(
                 feeds =
@@ -118,14 +117,9 @@ private class NewsRemoteViewsFactory(
             setTextViewText(R.id.item_title, item.title)
             setTextViewText(R.id.item_summary, item.summary)
             setTextViewText(R.id.item_source, item.source)
-            setViewVisibility(
-                R.id.item_summary,
-                if (sizeClass == WidgetSizeClass.COMPACT || item.summary.isBlank()) {
-                    View.GONE
-                } else {
-                    View.VISIBLE
-                },
-            )
+            val showSummary = sizeClass != WidgetSizeClass.COMPACT && item.summary.isNotBlank()
+            setViewVisibility(R.id.item_summary, if (showSummary) View.VISIBLE else View.GONE)
+            clearButtonLane(showSummary, item.summary)
 
             val bitmap = item.imageUrl?.let { loadBitmap(it) }
             if (bitmap != null) {
@@ -148,6 +142,39 @@ private class NewsRemoteViewsFactory(
             val fillIn = Intent().apply { data = Uri.parse(item.link) }
             setOnClickFillInIntent(R.id.item_root, fillIn)
         }
+    }
+
+    /**
+     * Regular/expanded chrome puts prev/next buttons in the bottom corners. Pad the text that can
+     * reach their lane sideways instead of reserving height, which short widgets don't have:
+     * the summary, plus the title when there is no summary or it fits on one line.
+     */
+    private fun RemoteViews.clearButtonLane(
+        showSummary: Boolean,
+        summary: String,
+    ) {
+        // Block padding and summary text size of widget_item.xml / widget_item_expanded.xml.
+        val (blockPaddingDp, summarySp) =
+            when (sizeClass) {
+                WidgetSizeClass.COMPACT -> return
+                WidgetSizeClass.REGULAR -> 14 to 12f
+                WidgetSizeClass.EXPANDED -> 18 to 14f
+            }
+        val res = context.resources
+        val density = res.displayMetrics.density
+        val laneDp = res.getDimensionPixelSize(R.dimen.widget_button_lane) / density
+        val sideDp = (laneDp - blockPaddingDp).coerceAtLeast(0f)
+        val side = (sideDp * density).toInt()
+        val summaryWidthPx = (widthDp - 2 * (blockPaddingDp + sideDp)) * density
+        // Measure with the summary's real paint: a one-line summary leaves the title's last line
+        // inside the lane too.
+        val summaryPaint =
+            TextPaint().apply {
+                textSize = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_SP, summarySp, res.displayMetrics)
+            }
+        val oneLineSummary = summaryPaint.measureText(summary) <= summaryWidthPx
+        if (showSummary) setViewPadding(R.id.item_summary, side, 0, side, 0)
+        if (!showSummary || oneLineSummary) setViewPadding(R.id.item_title, side, 0, side, 0)
     }
 
     private fun faviconUrl(link: String): String? {

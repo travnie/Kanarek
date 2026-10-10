@@ -44,6 +44,8 @@ private class QuoteRemoteViewsFactory(
                 widthDp = options.widgetWidthDp(orientation),
                 heightDp = options.widgetHeightDp(orientation),
                 quoteLength = quote?.quote?.length ?: 0,
+                fontScale = context.resources.configuration.fontScale,
+                hasAuthor = quote?.author?.isNotBlank() == true,
             )
     }
 
@@ -58,9 +60,13 @@ private class QuoteRemoteViewsFactory(
         return RemoteViews(context.packageName, R.layout.quote_widget_item).apply {
             setTextViewText(R.id.quote_text, item.quote)
             setTextViewText(R.id.quote_author, if (item.author.isBlank()) "" else "— ${item.author}")
-            setViewVisibility(R.id.quote_author, if (item.author.isBlank()) View.GONE else View.VISIBLE)
+            setViewVisibility(
+                R.id.quote_author,
+                if (item.author.isBlank() || !typography.showAuthor) View.GONE else View.VISIBLE,
+            )
             setTextViewTextSize(R.id.quote_text, TypedValue.COMPLEX_UNIT_SP, typography.quoteSp)
             setTextViewTextSize(R.id.quote_author, TypedValue.COMPLEX_UNIT_SP, typography.authorSp)
+            setInt(R.id.quote_text, "setMaxLines", typography.maxLines)
             setOnClickFillInIntent(
                 R.id.quote_item_root,
                 Intent().apply {

@@ -109,7 +109,7 @@ private fun Bundle.positiveOption(
     default: Int,
 ): Int = getInt(primary).takeIf { it > 0 } ?: getInt(fallback, default).takeIf { it > 0 } ?: default
 
-private const val DEFAULT_WIDGET_WIDTH_DP = 240
+internal const val DEFAULT_WIDGET_WIDTH_DP = 240
 private const val DEFAULT_WIDGET_HEIGHT_DP = 110
 private const val NEWS_COMPACT_WIDTH_DP = 200
 private const val PLAYER_COMPACT_WIDTH_DP = 260
