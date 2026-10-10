@@ -57,13 +57,55 @@ jobs:
         # plain testDebugUnitTest/lintDebug. Unit tests and lint run on play (superset of
         # sources); fossDebug is assembled too so a GMS reference leaking into main/foss
         # sources fails CI immediately. Shared common tests run on the Android host target.
-        run: ./gradlew assemblePlayDebug assembleFossDebug testPlayDebugUnitTest :shared:testAndroidHostTest lintPlayDebug --stacktrace
+        # roborazzi.test.record: the unit-test run also writes JVM screenshots (ScreenshotTest).
+        run: ./gradlew assemblePlayDebug assembleFossDebug testPlayDebugUnitTest :shared:testAndroidHostTest lintPlayDebug -Proborazzi.test.record=true --stacktrace
 
       - name: Upload debug APK
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: kanarek-debug-apk
           path: app/build/outputs/apk/*/debug/*.apk
+          if-no-files-found: warn
+
+      - name: Upload JVM screenshots
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: kanarek-screenshots-jvm
+          path: app/build/outputs/roborazzi/*.png
+          retention-days: 14
+          if-no-files-found: warn
+
+  emulator-smoke:
+    # Real-device check the JVM screenshots can't give: install the debug APK, cold-start both
+    # pages on an Android 16 emulator, fail on a crash, keep screenshots + logcat.
+    name: Emulator smoke
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: kanarek-debug-apk
+          path: apk
+
+      - name: Launch on emulator
+        # aistee's composite action: KVM + cached AVD snapshot.
+        uses: travnie/aistee/.github/actions/run-android-emulator@0d4aa44faf46fb716738b170452410fcc2371ede
+        with:
+          avd-name: kanarek-ci
+          script: |
+            mkdir -p out && adb install -r "$(ls apk/play/debug/*.apk | head -1)" && adb logcat -c && adb shell am start -W -n com.kanarek/.HomeActivity && sleep 8 && adb exec-out screencap -p > out/reader.png && adb shell am start -W -n com.kanarek/.HomeActivity --ei com.kanarek.extra.PAGE 1 && sleep 5 && adb exec-out screencap -p > out/player.png && adb logcat -d > out/logcat.txt && ! grep -q "FATAL EXCEPTION" out/logcat.txt
+
+      - name: Upload emulator screenshots
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: kanarek-screenshots-emulator
+          path: out/
+          retention-days: 14
           if-no-files-found: warn
 
 
