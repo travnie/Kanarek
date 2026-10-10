@@ -153,11 +153,12 @@ private class NewsRemoteViewsFactory(
         showSummary: Boolean,
         summary: String,
     ) {
-        val blockPaddingDp =
+        // Block padding and summary text size of widget_item.xml / widget_item_expanded.xml.
+        val (blockPaddingDp, summarySp) =
             when (sizeClass) {
                 WidgetSizeClass.COMPACT -> return
-                WidgetSizeClass.REGULAR -> 14
-                WidgetSizeClass.EXPANDED -> 18
+                WidgetSizeClass.REGULAR -> 14 to 12f
+                WidgetSizeClass.EXPANDED -> 18 to 14f
             }
         val res = context.resources
         val density = res.displayMetrics.density
@@ -165,11 +166,11 @@ private class NewsRemoteViewsFactory(
         val sideDp = (laneDp - blockPaddingDp).coerceAtLeast(0f)
         val side = (sideDp * density).toInt()
         val summaryWidthPx = (widthDp - 2 * (blockPaddingDp + sideDp)) * density
-        // Measure with the summary's real 12sp paint: a one-line summary leaves the title's last
-        // line inside the lane too.
+        // Measure with the summary's real paint: a one-line summary leaves the title's last line
+        // inside the lane too.
         val summaryPaint =
             TextPaint().apply {
-                textSize = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_SP, 12f, res.displayMetrics)
+                textSize = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_SP, summarySp, res.displayMetrics)
             }
         val oneLineSummary = summaryPaint.measureText(summary) <= summaryWidthPx
         if (showSummary) setViewPadding(R.id.item_summary, side, 0, side, 0)
