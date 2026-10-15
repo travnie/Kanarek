@@ -65,7 +65,9 @@ class HomeActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         requestedPage.intValue = (intent?.getIntExtra(EXTRA_PAGE, PAGE_READER) ?: PAGE_READER).coerceIn(PAGE_READER, PAGE_TOOLS)
-        if (intent?.getBooleanExtra(EXTRA_SCAN, false) == true) scanRequest.intValue++
+        if (savedInstanceState == null && intent?.getBooleanExtra(EXTRA_SCAN, false) == true) {
+            scanRequest.intValue++
+        }
         val settings = SettingsStore(applicationContext)
         val repository = NewsRepository()
         setContent {

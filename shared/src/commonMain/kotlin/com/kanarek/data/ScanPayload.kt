@@ -93,16 +93,23 @@ object ScanPayloadParser {
         }.toMap()
     }
 
-    private fun recordFields(source: String): Map<String, String> =
-        source.replace("\r\n", "\n").lines().flatMap { line ->
+    private fun recordFields(source: String): Map<String, String> {
+        val result = linkedMapOf<String, String>()
+        for (line in source.replace("\r\n", "\n").lines()) {
             val colon = line.indexOf(':')
-            if (colon <= 0) emptyList() else {
-                val header = line.substring(0, colon)
-                val key = header.substringBefore(';').uppercase()
-                val value = line.substring(colon + 1).take(2000)
-                val tzid = header.split(';').firstOrNull { it.startsWith("TZID=", ignoreCase = true) }
-                    ?.substringAfter('=')
-                listOfNotNull(key to value, tzid?.let { (key + "_TZID") to it })
-            }
-        }.toMap()
+            if (colon <= 0) continue
+            val header = line.substring(0, colon)
+            val key = header.substringBefore(';').uppercase()
+            val value = line.substring(colon + 1).take(2000)
+            val tzid = header.split(';').firstOrNull { it.startsWith("TZID=", ignoreCase = true) }
+                ?.substringAfter('=')
+            if (key in setOf("TEL", "EMAIL") && result.containsKey(key)) {
+                var index = 2
+                while (result.containsKey(key + "_" + index)) index++
+                result[key + "_" + index] = value
+            } else result[key] = value
+            if (tzid != null) result[key + "_TZID"] = tzid
+        }
+        return result
+    }
 }

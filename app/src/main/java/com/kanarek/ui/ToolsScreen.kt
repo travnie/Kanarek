@@ -46,6 +46,8 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -175,6 +177,7 @@ internal fun ToolsScreen(
         } else if (isActive) {
             BenchWebView(
                 bench = selected,
+                scanRequest = scanRequest,
                 modifier = Modifier.fillMaxSize().padding(padding),
                 onExit = { selectedKey = null },
                 onScan = { scanned = it },
@@ -188,11 +191,12 @@ internal fun ToolsScreen(
     }
 }
 
-// Remote origins receive no JavaScript bridge. Local bundled builds and native
-// import/export use a separate, explicit bridge in a later phase.
+// Only Codebench's pinned HTTPS origin can report scanned text. No remote
+// page can invoke Android actions through the bridge.
 @Composable
 private fun BenchWebView(
     bench: Bench,
+    scanRequest: Int,
     modifier: Modifier = Modifier,
     onExit: () -> Unit,
     onScan: (ScanPayload) -> Unit,
@@ -202,6 +206,19 @@ private fun BenchWebView(
     val trustedOrigin = remember(bench) { Uri.parse(bench.url) }
     var fileCallback by remember { mutableStateOf<ValueCallback<Array<Uri>>?>(null) }
     var cameraRequest by remember { mutableStateOf<PermissionRequest?>(null) }
+    var startedScanRequest by remember(bench) { mutableIntStateOf(0) }
+    val currentScanRequest by rememberUpdatedState(scanRequest)
+
+    fun startCameraIfRequested(view: WebView?) {
+        if (bench != Bench.CODE || view == null ||
+            currentScanRequest <= startedScanRequest || view.progress < 100
+        ) return
+        startedScanRequest = currentScanRequest
+        view.evaluateJavascript(
+            "(function(){const start=document.getElementById('camStart');if(start&&!start.disabled)start.click();})();",
+            null,
+        )
+    }
 
     val filePicker = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
         fileCallback?.onReceiveValue(
@@ -260,6 +277,9 @@ private fun BenchWebView(
                 }
 
                 override fun onPageFinished(view: WebView?, url: String?) {
+                    if (url?.let { isTrustedOrigin(Uri.parse(it), trustedOrigin) } == true) {
+                        startCameraIfRequested(view)
+                    }
                     if (supportsScanMessages &&
                         !WebViewFeature.isFeatureSupported(WebViewFeature.DOCUMENT_START_SCRIPT) &&
                         url?.let { isTrustedOrigin(Uri.parse(it), trustedOrigin) } == true
@@ -329,6 +349,9 @@ private fun BenchWebView(
 
     BackHandler {
         if (webView.canGoBack()) webView.goBack() else onExit()
+    }
+    LaunchedEffect(scanRequest, webView) {
+        startCameraIfRequested(webView)
     }
     DisposableEffect(webView, lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->

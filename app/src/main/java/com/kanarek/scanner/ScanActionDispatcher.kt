@@ -1,6 +1,7 @@
 package com.kanarek.scanner
 
 import android.content.Context
+import android.content.ContentValues
 import android.content.Intent
 import android.net.Uri
 import android.net.wifi.WifiNetworkSuggestion
@@ -36,9 +37,25 @@ object ScanActionDispatcher {
             ScanKind.CONTACT -> Intent(Intent.ACTION_INSERT).apply {
                 type = ContactsContract.Contacts.CONTENT_TYPE
                 putExtra(ContactsContract.Intents.Insert.NAME, payload.fields["FN"] ?: payload.fields["N"].orEmpty())
-                payload.fields["TEL"]?.let { putExtra(ContactsContract.Intents.Insert.PHONE, it) }
-                payload.fields["EMAIL"]?.let { putExtra(ContactsContract.Intents.Insert.EMAIL, it) }
+                val phones = payload.fields.filterKeys { it == "TEL" || it.startsWith("TEL_") }.values.filter { it.isNotBlank() }
+                val emails = payload.fields.filterKeys { it == "EMAIL" || it.startsWith("EMAIL_") }.values.filter { it.isNotBlank() }
+                phones.firstOrNull()?.let { putExtra(ContactsContract.Intents.Insert.PHONE, it) }
+                emails.firstOrNull()?.let { putExtra(ContactsContract.Intents.Insert.EMAIL, it) }
                 payload.fields["ORG"]?.let { putExtra(ContactsContract.Intents.Insert.COMPANY, it) }
+                val extra = arrayListOf<ContentValues>()
+                phones.drop(1).forEach { phone ->
+                    extra += ContentValues().apply {
+                        put(ContactsContract.Data.MIMETYPE, ContactsContract.CommonDataKinds.Phone.CONTENT_ITEM_TYPE)
+                        put(ContactsContract.CommonDataKinds.Phone.NUMBER, phone)
+                    }
+                }
+                emails.drop(1).forEach { email ->
+                    extra += ContentValues().apply {
+                        put(ContactsContract.Data.MIMETYPE, ContactsContract.CommonDataKinds.Email.CONTENT_ITEM_TYPE)
+                        put(ContactsContract.CommonDataKinds.Email.ADDRESS, email)
+                    }
+                }
+                if (extra.isNotEmpty()) putParcelableArrayListExtra(ContactsContract.Intents.Insert.DATA, extra)
             }
             ScanKind.EVENT -> Intent(Intent.ACTION_INSERT, CalendarContract.Events.CONTENT_URI).apply {
                 putExtra(CalendarContract.Events.TITLE, payload.fields["SUMMARY"].orEmpty())
@@ -58,22 +75,27 @@ object ScanActionDispatcher {
             }
             ScanKind.EMAIL -> {
                 val uri = Uri.parse(payload.raw.trim())
-                if (uri.scheme != "mailto") return false
+                if (!uri.scheme.equals("mailto", ignoreCase = true)) return false
                 Intent(Intent.ACTION_SENDTO, uri)
             }
             ScanKind.PHONE -> {
-                val number = payload.raw.trim().substringAfter(':')
+                val source = payload.raw.trim().substringAfter(':')
+                val number = source.substringBefore(';').substringBefore('?')
                 if (!Regex("^[+0-9() .-]{3,40}$").matches(number)) return false
-                Intent(Intent.ACTION_DIAL, Uri.fromParts("tel", number, null))
+                val ext = source.split(';').firstOrNull { it.startsWith("ext=", ignoreCase = true) }
+                    ?.substringAfter('=')?.takeIf { it.length in 1..12 && it.all(Char::isDigit) }
+                val dial = if (ext == null) number else number + ";ext=" + ext
+                Intent(Intent.ACTION_DIAL, Uri.fromParts("tel", dial, null))
             }
             ScanKind.SMS -> {
                 val recipient = payload.raw.trim().substringAfter(':').substringBefore(':').substringBefore('?')
                 if (!Regex("^[+0-9() .-]{3,40}$").matches(recipient)) return false
                 Intent(Intent.ACTION_SENDTO, Uri.fromParts("smsto", recipient, null)).apply {
                     val raw = payload.raw.trim().substringAfter(':')
-                    val body = if (raw.contains("?body=", ignoreCase = true)) {
-                        Uri.decode(raw.substringAfter('?').substringAfter("body=", ""))
-                    } else raw.substringAfter(':', "")
+                    val queryBody = raw.substringAfter('?', "").split('&')
+                        .firstOrNull { it.startsWith("body=", ignoreCase = true) }
+                        ?.substringAfter('=')
+                    val body = if (queryBody != null) Uri.decode(queryBody) else raw.substringAfter(':', "")
                     if (body.isNotEmpty()) putExtra("sms_body", body.take(1000))
                 }
             }

@@ -95,9 +95,6 @@ Implementation underway on `feat/scan-tile-actions`:
 
 ### Planned shortcuts
 
-- Quick Settings `TileService` launches Codebench's **Scan** view directly.
-  Use Android-version-correct activity launching (PendingIntent on API 34+),
-  runtime CAMERA permission and meaningful error/cancel states.
 - Small launcher widget with Scan / Open document / Tools shortcuts, implemented
   with safe RemoteViews and widget inflation tests.
 - Do not block startup or start a background media service for the scanner.

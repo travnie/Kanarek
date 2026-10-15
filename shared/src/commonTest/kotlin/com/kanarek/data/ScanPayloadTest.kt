@@ -34,6 +34,13 @@ class ScanPayloadTest {
         }
     }
 
+    @Test fun repeatsPreservedForContactDraft() {
+        val result = ScanPayloadParser.parse("BEGIN:VCARD\\nFN:Jane\\nTEL:111\\nTEL:222\\nEMAIL:a@example.org\\nEMAIL:b@example.org\\nEND:VCARD")
+        assertEquals(ScanKind.CONTACT, result.kind)
+        assertEquals("222", result.fields["TEL_2"])
+        assertEquals("b@example.org", result.fields["EMAIL_2"])
+    }
+
     @Test fun linksAndUnknowns() {
         assertEquals(ScanKind.WEB, ScanPayloadParser.parse("https://example.com").kind)
         assertEquals(ScanKind.PLAYLIST, ScanPayloadParser.parse("https://example.org/tv.m3u8").kind)
