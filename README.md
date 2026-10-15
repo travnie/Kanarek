@@ -67,6 +67,7 @@ The Backend URL may remain blank: regular feed refreshes stay on-device, while f
 
 ## Documentation
 
+- [Tools and Bench integration roadmap](docs/TOOLS_INTEGRATION.md)
 - [Architecture](docs/ARCHITECTURE.md)
 - [Build, tests, and CI](docs/DEVELOPMENT.md)
 - [Cloudflare Worker and API](docs/WORKER.md)
