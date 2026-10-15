@@ -17,7 +17,6 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -25,7 +24,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.QrCodeScanner
@@ -40,6 +38,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -68,7 +67,10 @@ private enum class Bench(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-internal fun ToolsScreen(onMenu: () -> Unit) {
+internal fun ToolsScreen(
+    onMenu: () -> Unit,
+    isActive: Boolean,
+) {
     var selectedKey by rememberSaveable { mutableStateOf<String?>(null) }
     val selected = Bench.entries.firstOrNull { it.name == selectedKey }
 
@@ -127,6 +129,7 @@ internal fun ToolsScreen(onMenu: () -> Unit) {
         } else {
             BenchWebView(
                 bench = selected,
+                isActive = isActive,
                 modifier = Modifier.fillMaxSize().padding(padding),
                 onExit = { selectedKey = null },
             )
@@ -139,6 +142,7 @@ internal fun ToolsScreen(onMenu: () -> Unit) {
 @Composable
 private fun BenchWebView(
     bench: Bench,
+    isActive: Boolean,
     modifier: Modifier = Modifier,
     onExit: () -> Unit,
 ) {
@@ -227,16 +231,27 @@ private fun BenchWebView(
         }
     }
 
-    BackHandler { if (webView.canGoBack()) webView.goBack() else onExit() }
+    BackHandler(enabled = isActive) {
+        if (webView.canGoBack()) webView.goBack() else onExit()
+    }
+    LaunchedEffect(webView, isActive) {
+        if (isActive) webView.onResume() else webView.onPause()
+    }
     DisposableEffect(webView) {
         onDispose {
             fileCallback?.onReceiveValue(null)
             fileCallback = null
             cameraRequest?.deny()
             cameraRequest = null
-            webView.stopLoading()
-            webView.destroy()
         }
     }
-    AndroidView(factory = { webView }, modifier = modifier)
+    AndroidView(
+        factory = { webView },
+        modifier = modifier,
+        onReset = null,
+        onRelease = { released ->
+            released.stopLoading()
+            released.destroy()
+        },
+    )
 }

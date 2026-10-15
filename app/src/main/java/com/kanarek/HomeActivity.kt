@@ -244,7 +244,11 @@ private fun HomeShell(
                             onMenu = openMenu,
                         )
                     HomeActivity.PAGE_PLAYER -> PlayerScreen(settings = settings, onMenu = openMenu)
-                    HomeActivity.PAGE_TOOLS -> ToolsScreen(onMenu = openMenu)
+                    HomeActivity.PAGE_TOOLS ->
+                        ToolsScreen(
+                            onMenu = openMenu,
+                            isActive = pagerState.currentPage == HomeActivity.PAGE_TOOLS,
+                        )
                 }
             }
         }
