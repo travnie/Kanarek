@@ -16,7 +16,7 @@ class ScanTileService : TileService() {
         val target = Intent(this, HomeActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
             putExtra(HomeActivity.EXTRA_PAGE, HomeActivity.PAGE_TOOLS)
-            putExtra(HomeActivity.EXTRA_SCAN, true)
+            putExtra(HomeActivity.EXTRA_SCAN_TOKEN, ScanTileToken.issue())
         }
         if (Build.VERSION.SDK_INT >= 34) {
             val pending = PendingIntent.getActivity(

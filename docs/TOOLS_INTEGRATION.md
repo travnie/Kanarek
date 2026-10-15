@@ -80,6 +80,8 @@ replace Streambench's allowlisted relay with an unrestricted proxy.
 ### 4. Android shortcuts
 
 Implementation underway on `feat/scan-tile-actions`:
+- Quick Tile uses a one-use short-lived token to authorize camera autostart,
+  so forged external Activity intents cannot silently request capture.
 - Quick Tile launches Codebench scan and previews structured results via an
   origin-restricted WebMessageListener, not unrestricted JS interfaces.
 - Native parser classifies WIFI, vCard/MECARD, VEVENT, HTTPS links, phone, SMS,

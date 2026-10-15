@@ -42,6 +42,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.kanarek.data.AppThemeMode
+import com.kanarek.scanner.ScanTileToken
 import com.kanarek.data.NewsRepository
 import com.kanarek.data.SettingsStore
 import com.kanarek.ui.PlayerScreen
@@ -65,7 +66,9 @@ class HomeActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         requestedPage.intValue = (intent?.getIntExtra(EXTRA_PAGE, PAGE_READER) ?: PAGE_READER).coerceIn(PAGE_READER, PAGE_TOOLS)
-        if (savedInstanceState == null && intent?.getBooleanExtra(EXTRA_SCAN, false) == true) {
+        if (savedInstanceState == null &&
+            ScanTileToken.consume(intent?.getStringExtra(EXTRA_SCAN_TOKEN))
+        ) {
             scanRequest.intValue++
         }
         val settings = SettingsStore(applicationContext)
@@ -90,12 +93,12 @@ class HomeActivity : ComponentActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         requestedPage.intValue = intent.getIntExtra(EXTRA_PAGE, requestedPage.intValue).coerceIn(PAGE_READER, PAGE_TOOLS)
-        if (intent.getBooleanExtra(EXTRA_SCAN, false)) scanRequest.intValue++
+        if (ScanTileToken.consume(intent.getStringExtra(EXTRA_SCAN_TOKEN))) scanRequest.intValue++
     }
 
     companion object {
         const val EXTRA_PAGE = "com.kanarek.extra.PAGE"
-        const val EXTRA_SCAN = "com.kanarek.extra.SCAN"
+        const val EXTRA_SCAN_TOKEN = "com.kanarek.extra.SCAN_TOKEN"
         const val PAGE_READER = 0
         const val PAGE_PLAYER = 1
         const val PAGE_TOOLS = 2
