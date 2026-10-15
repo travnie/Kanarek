@@ -94,9 +94,15 @@ object ScanPayloadParser {
     }
 
     private fun recordFields(source: String): Map<String, String> =
-        source.replace("\r\n", "\n").lines().mapNotNull { line ->
+        source.replace("\r\n", "\n").lines().flatMap { line ->
             val colon = line.indexOf(':')
-            if (colon <= 0) null else line.substring(0, colon).substringBefore(';').uppercase() to
-                line.substring(colon + 1).take(2000)
+            if (colon <= 0) emptyList() else {
+                val header = line.substring(0, colon)
+                val key = header.substringBefore(';').uppercase()
+                val value = line.substring(colon + 1).take(2000)
+                val tzid = header.split(';').firstOrNull { it.startsWith("TZID=", ignoreCase = true) }
+                    ?.substringAfter('=')
+                listOfNotNull(key to value, tzid?.let { (key + "_TZID") to it })
+            }
         }.toMap()
 }

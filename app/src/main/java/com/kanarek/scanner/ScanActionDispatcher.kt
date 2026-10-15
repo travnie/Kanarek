@@ -22,7 +22,7 @@ object ScanActionDispatcher {
         ScanKind.WIFI -> "Review Wi-Fi network"
         ScanKind.CONTACT -> "Create contact"
         ScanKind.EVENT -> "Add to calendar"
-        ScanKind.WEB, ScanKind.PLAYLIST -> if (payload.raw.trim().startsWith("https://")) "Open in browser" else null
+        ScanKind.WEB, ScanKind.PLAYLIST -> if (payload.raw.trim().startsWith("https://", ignoreCase = true)) "Open in browser" else null
         ScanKind.EMAIL -> "Compose email"
         ScanKind.PHONE -> "Open dialer"
         ScanKind.SMS -> "Compose SMS"
@@ -44,10 +44,10 @@ object ScanActionDispatcher {
                 putExtra(CalendarContract.Events.TITLE, payload.fields["SUMMARY"].orEmpty())
                 putExtra(CalendarContract.Events.DESCRIPTION, payload.fields["DESCRIPTION"].orEmpty().take(1800))
                 putExtra(CalendarContract.Events.EVENT_LOCATION, payload.fields["LOCATION"].orEmpty())
-                parseDate(payload.fields["DTSTART"])?.let {
+                parseDate(payload.fields["DTSTART"], payload.fields["DTSTART_TZID"])?.let {
                     putExtra(CalendarContract.EXTRA_EVENT_BEGIN_TIME, it)
                 }
-                parseDate(payload.fields["DTEND"])?.let {
+                parseDate(payload.fields["DTEND"], payload.fields["DTEND_TZID"])?.let {
                     putExtra(CalendarContract.EXTRA_EVENT_END_TIME, it)
                 }
             }
@@ -67,10 +67,13 @@ object ScanActionDispatcher {
                 Intent(Intent.ACTION_DIAL, Uri.fromParts("tel", number, null))
             }
             ScanKind.SMS -> {
-                val recipient = payload.raw.trim().substringAfter(':').substringBefore(':')
+                val recipient = payload.raw.trim().substringAfter(':').substringBefore(':').substringBefore('?')
                 if (!Regex("^[+0-9() .-]{3,40}$").matches(recipient)) return false
                 Intent(Intent.ACTION_SENDTO, Uri.fromParts("smsto", recipient, null)).apply {
-                    val body = payload.raw.trim().substringAfter(':').substringAfter(':', "")
+                    val raw = payload.raw.trim().substringAfter(':')
+                    val body = if (raw.contains("?body=", ignoreCase = true)) {
+                        Uri.decode(raw.substringAfter('?').substringAfter("body=", ""))
+                    } else raw.substringAfter(':', "")
                     if (body.isNotEmpty()) putExtra("sms_body", body.take(1000))
                 }
             }
@@ -116,18 +119,19 @@ object ScanActionDispatcher {
         }.getOrElse { Intent(Settings.ACTION_WIFI_SETTINGS) }
     }
 
-    private fun parseDate(input: String?): Long? = runCatching {
+    private fun parseDate(input: String?, tzid: String? = null): Long? = runCatching {
+        val zone = tzid?.let { ZoneId.of(it) } ?: ZoneId.systemDefault()
         val date = input?.takeIf { it.length == 8 || it.length == 15 || it.length == 16 } ?: return null
         when {
             date.length == 8 ->
                 LocalDate.parse(date, DateTimeFormatter.BASIC_ISO_DATE)
-                    .atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
+                    .atStartOfDay(zone).toInstant().toEpochMilli()
             date.endsWith("Z") ->
                 LocalDateTime.parse(date.dropLast(1), DateTimeFormatter.ofPattern("yyyyMMdd'T'HHmmss"))
                     .toInstant(ZoneOffset.UTC).toEpochMilli()
             else ->
                 LocalDateTime.parse(date, DateTimeFormatter.ofPattern("yyyyMMdd'T'HHmmss"))
-                    .atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
+                    .atZone(zone).toInstant().toEpochMilli()
         }
     }.getOrNull()
 }
