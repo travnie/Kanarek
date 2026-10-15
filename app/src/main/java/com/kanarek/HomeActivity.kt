@@ -124,7 +124,8 @@ private fun HomeShell(
     val pagerState = rememberPagerState(initialPage = requestedPage) { PAGE_COUNT }
 
     // External page requests (widget deep-link via onNewIntent) steer the pager.
-    LaunchedEffect(requestedPage) {
+    LaunchedEffect(requestedPage, pendingScanRequest) {
+        // A second Tile tap may target Tools while requestedPage already equals PAGE_TOOLS.
         if (pagerState.currentPage != requestedPage) pagerState.animateScrollToPage(requestedPage)
     }
 
