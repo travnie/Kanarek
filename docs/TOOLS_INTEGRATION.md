@@ -79,9 +79,24 @@ replace Streambench's allowlisted relay with an unrestricted proxy.
 
 ### 4. Android shortcuts
 
-- Quick Settings `TileService` launches Codebench's **Scan** view directly.
-  Use Android-version-correct activity launching (PendingIntent on API 34+),
-  runtime CAMERA permission and meaningful error/cancel states.
+Implementation underway on `feat/scan-tile-actions`:
+- Quick Tile uses a one-use short-lived token to authorize camera autostart,
+  so forged external Activity intents cannot silently request capture.
+- Quick Tile launches Codebench scan and previews structured results via an
+  origin-restricted WebMessageListener, not unrestricted JS interfaces.
+- Native parser classifies WIFI, vCard/MECARD, VEVENT, HTTPS links, phone, SMS,
+  mailto, geo, playlists, and unknown text without taking action.
+- Intent actions require an explicit tap: Wi-Fi invokes Android's network
+  confirmation UI on API 30+ (settings fallback otherwise); contacts and
+  events open editable system insert screens; SMS and calls never auto-send/dial;
+  URLs are limited to HTTPS and never open on detection; raw text may be
+  copied or exported to a user-chosen document.
+- Sensitive Wi-Fi passwords are hidden in the scan preview. No QR payload
+  is persisted or sent to a Worker. Stop camera after a scan.
+- Test pure parsing in shared KMP tests and verify both Android flavors.
+
+### Planned shortcuts
+
 - Small launcher widget with Scan / Open document / Tools shortcuts, implemented
   with safe RemoteViews and widget inflation tests.
 - Do not block startup or start a background media service for the scanner.

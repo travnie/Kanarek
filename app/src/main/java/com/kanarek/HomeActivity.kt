@@ -42,6 +42,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.kanarek.data.AppThemeMode
+import com.kanarek.scanner.ScanTileToken
 import com.kanarek.data.NewsRepository
 import com.kanarek.data.SettingsStore
 import com.kanarek.ui.PlayerScreen
@@ -59,11 +60,16 @@ import kotlinx.coroutines.launch
  */
 class HomeActivity : ComponentActivity() {
     private val requestedPage = mutableIntStateOf(PAGE_READER)
+    private val scanRequest = mutableIntStateOf(0)
+    private val consumedScanRequest = mutableIntStateOf(0)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         requestedPage.intValue = (intent?.getIntExtra(EXTRA_PAGE, PAGE_READER) ?: PAGE_READER).coerceIn(PAGE_READER, PAGE_TOOLS)
+        if (ScanTileToken.consume(intent?.getStringExtra(EXTRA_SCAN_TOKEN))) {
+            scanRequest.intValue++
+        }
         val settings = SettingsStore(applicationContext)
         val repository = NewsRepository()
         setContent {
@@ -75,6 +81,10 @@ class HomeActivity : ComponentActivity() {
                     repository = repository,
                     themeMode = themeMode,
                     requestedPage = requestedPage.intValue,
+                    pendingScanRequest = scanRequest.intValue.takeIf { it > consumedScanRequest.intValue } ?: 0,
+                    onScanRequestConsumed = { id ->
+                        if (id > consumedScanRequest.intValue) consumedScanRequest.intValue = id
+                    },
                     onCloseApp = { finishAffinity() },
                 )
             }
@@ -85,10 +95,12 @@ class HomeActivity : ComponentActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         requestedPage.intValue = intent.getIntExtra(EXTRA_PAGE, requestedPage.intValue).coerceIn(PAGE_READER, PAGE_TOOLS)
+        if (ScanTileToken.consume(intent.getStringExtra(EXTRA_SCAN_TOKEN))) scanRequest.intValue++
     }
 
     companion object {
         const val EXTRA_PAGE = "com.kanarek.extra.PAGE"
+        const val EXTRA_SCAN_TOKEN = "com.kanarek.extra.SCAN_TOKEN"
         const val PAGE_READER = 0
         const val PAGE_PLAYER = 1
         const val PAGE_TOOLS = 2
@@ -103,6 +115,8 @@ private fun HomeShell(
     repository: NewsRepository,
     themeMode: AppThemeMode,
     requestedPage: Int,
+    pendingScanRequest: Int,
+    onScanRequestConsumed: (Int) -> Unit,
     onCloseApp: () -> Unit,
 ) {
     val scope = rememberCoroutineScope()
@@ -110,7 +124,8 @@ private fun HomeShell(
     val pagerState = rememberPagerState(initialPage = requestedPage) { PAGE_COUNT }
 
     // External page requests (widget deep-link via onNewIntent) steer the pager.
-    LaunchedEffect(requestedPage) {
+    LaunchedEffect(requestedPage, pendingScanRequest) {
+        // A second Tile tap may target Tools while requestedPage already equals PAGE_TOOLS.
         if (pagerState.currentPage != requestedPage) pagerState.animateScrollToPage(requestedPage)
     }
 
@@ -248,6 +263,8 @@ private fun HomeShell(
                         ToolsScreen(
                             onMenu = openMenu,
                             isActive = pagerState.currentPage == HomeActivity.PAGE_TOOLS,
+                            pendingScanRequest = pendingScanRequest,
+                            onScanRequestConsumed = onScanRequestConsumed,
                         )
                 }
             }

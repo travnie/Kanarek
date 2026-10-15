@@ -5,6 +5,7 @@ import android.graphics.Bitmap
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
+import org.json.JSONObject
 import android.webkit.CookieManager
 import android.webkit.PermissionRequest
 import android.webkit.ValueCallback
@@ -42,8 +43,11 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -54,9 +58,39 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
+import androidx.webkit.WebViewCompat
+import androidx.webkit.WebViewFeature
+import com.kanarek.data.ScanPayload
+import com.kanarek.data.ScanPayloadParser
 import com.kanarek.R
 
 // One native hub. Bench code remains owned by travnie/twojstar.
+// Observe Codebench's visible scan history, not third-party pages or page data.
+// Result only opens an Android confirmation UI; this bridge has no native actions.
+private val codeScanObserver = """
+(() => {
+  if (window.__kanarekScanObserver) return;
+  window.__kanarekScanObserver = true;
+  const install = () => {
+    const history = document.getElementById('scanHist');
+    if (!history) return;
+    new MutationObserver(records => {
+      if (!records.some(record => [...record.addedNodes].some(node =>
+          node.nodeType === 1 && node.classList.contains('item')))) return;
+      const value = document.getElementById('resVal')?.textContent || '';
+      const format = document.getElementById('resFmt')?.textContent || '';
+      if (!value || value.length > 16384) return;
+      const stop = document.getElementById('camStop');
+      if (stop && !stop.disabled) stop.click();
+      window.KanarekScan?.postMessage(JSON.stringify({v: 1, text: value, format}));
+    }).observe(history, {childList: true});
+  };
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', install, {once: true});
+  } else install();
+})();
+""".trimIndent()
+
 private fun isTrustedOrigin(target: Uri, trusted: Uri): Boolean =
     target.scheme == "https" &&
         target.host?.equals(trusted.host, ignoreCase = true) == true &&
@@ -79,9 +113,15 @@ private enum class Bench(
 internal fun ToolsScreen(
     onMenu: () -> Unit,
     isActive: Boolean,
+    pendingScanRequest: Int,
+    onScanRequestConsumed: (Int) -> Unit,
 ) {
     var selectedKey by rememberSaveable { mutableStateOf<String?>(null) }
     val selected = Bench.entries.firstOrNull { it.name == selectedKey }
+    var scanned by remember { mutableStateOf<ScanPayload?>(null) }
+    LaunchedEffect(pendingScanRequest) {
+        if (pendingScanRequest > 0) selectedKey = Bench.CODE.name
+    }
 
     Scaffold(
         topBar = {
@@ -138,26 +178,53 @@ internal fun ToolsScreen(
         } else if (isActive) {
             BenchWebView(
                 bench = selected,
+                pendingScanRequest = pendingScanRequest,
+                onScanRequestConsumed = onScanRequestConsumed,
                 modifier = Modifier.fillMaxSize().padding(padding),
                 onExit = { selectedKey = null },
+                onScan = { scanned = it },
             )
+        }
+    }
+    if (isActive) {
+        scanned?.let { payload ->
+            ScanResultDialog(payload = payload, onDismiss = { scanned = null })
         }
     }
 }
 
-// Remote origins receive no JavaScript bridge. Local bundled builds and native
-// import/export use a separate, explicit bridge in a later phase.
+// Only Codebench's pinned HTTPS origin can report scanned text. No remote
+// page can invoke Android actions through the bridge.
 @Composable
 private fun BenchWebView(
     bench: Bench,
+    pendingScanRequest: Int,
+    onScanRequestConsumed: (Int) -> Unit,
     modifier: Modifier = Modifier,
     onExit: () -> Unit,
+    onScan: (ScanPayload) -> Unit,
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     val trustedOrigin = remember(bench) { Uri.parse(bench.url) }
     var fileCallback by remember { mutableStateOf<ValueCallback<Array<Uri>>?>(null) }
     var cameraRequest by remember { mutableStateOf<PermissionRequest?>(null) }
+    var startedScanRequest by remember(bench) { mutableIntStateOf(0) }
+    val currentScanRequest by rememberUpdatedState(pendingScanRequest)
+    val currentConsume by rememberUpdatedState(onScanRequestConsumed)
+
+    fun startCameraIfRequested(view: WebView?) {
+        val requested = currentScanRequest
+        if (bench != Bench.CODE || view == null ||
+            requested == 0 || requested <= startedScanRequest || view.progress < 100
+        ) return
+        startedScanRequest = requested
+        currentConsume(requested)
+        view.evaluateJavascript(
+            "(function(){const start=document.getElementById('camStart');if(start&&!start.disabled)start.click();})();",
+            null,
+        )
+    }
 
     val filePicker = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
         fileCallback?.onReceiveValue(
@@ -183,6 +250,28 @@ private fun BenchWebView(
             settings.mediaPlaybackRequiresUserGesture = true
             CookieManager.getInstance().setAcceptThirdPartyCookies(this, false)
 
+            val scanOrigins = setOf("https://codebench.trfny.com")
+            val supportsScanMessages = bench == Bench.CODE &&
+                WebViewFeature.isFeatureSupported(WebViewFeature.WEB_MESSAGE_LISTENER)
+            if (supportsScanMessages) {
+                WebViewCompat.addWebMessageListener(
+                    this, "KanarekScan", scanOrigins,
+                ) { _, message, origin, isMainFrame, _ ->
+                    if (isMainFrame && isTrustedOrigin(origin, trustedOrigin)) {
+                        val scanned = runCatching {
+                            val json = JSONObject(message.data.orEmpty())
+                            val value = json.optString("text")
+                            if (json.optInt("v") != 1 || value.isBlank() || value.length > 16384) null
+                            else ScanPayloadParser.parse(value)
+                        }.getOrNull()
+                        scanned?.let(onScan)
+                    }
+                }
+                if (WebViewFeature.isFeatureSupported(WebViewFeature.DOCUMENT_START_SCRIPT)) {
+                    WebViewCompat.addDocumentStartJavaScript(this, codeScanObserver, scanOrigins)
+                }
+            }
+
             webViewClient = object : WebViewClient() {
                 override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest?): Boolean {
                     val target = request?.url ?: return true
@@ -191,6 +280,18 @@ private fun BenchWebView(
                         runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, target)) }
                     }
                     return true
+                }
+
+                override fun onPageFinished(view: WebView?, url: String?) {
+                    if (url?.let { isTrustedOrigin(Uri.parse(it), trustedOrigin) } == true) {
+                        startCameraIfRequested(view)
+                    }
+                    if (supportsScanMessages &&
+                        !WebViewFeature.isFeatureSupported(WebViewFeature.DOCUMENT_START_SCRIPT) &&
+                        url?.let { isTrustedOrigin(Uri.parse(it), trustedOrigin) } == true
+                    ) {
+                        view?.evaluateJavascript(codeScanObserver, null)
+                    }
                 }
 
                 // shouldOverrideUrlLoading is not called for POST navigation.
@@ -254,6 +355,9 @@ private fun BenchWebView(
 
     BackHandler {
         if (webView.canGoBack()) webView.goBack() else onExit()
+    }
+    LaunchedEffect(pendingScanRequest, webView) {
+        startCameraIfRequested(webView)
     }
     DisposableEffect(webView, lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->

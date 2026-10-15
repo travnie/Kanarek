@@ -80,6 +80,7 @@
     <!-- Home / launcher -->
     <string name="home_news">News</string>
     <string name="tools_title">Tools</string>
+    <string name="scan_tile_label">Scan code</string>
     <string name="tools_intro">Open the three Bench workshops inside Kanarek. This first integration uses their hosted versions; offline bundles and native exports are coming next.</string>
     <string name="tools_codebench_description">QR, barcodes and camera scanning</string>
     <string name="tools_docbench_description">Documents, PDFs and text files</string>
