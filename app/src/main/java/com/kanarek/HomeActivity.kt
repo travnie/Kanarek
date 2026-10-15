@@ -18,6 +18,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Article
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Radio
+import androidx.compose.material.icons.filled.Build
 import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
@@ -45,11 +46,12 @@ import com.kanarek.data.NewsRepository
 import com.kanarek.data.SettingsStore
 import com.kanarek.ui.PlayerScreen
 import com.kanarek.ui.ReaderScreen
+import com.kanarek.ui.ToolsScreen
 import com.kanarek.ui.theme.KanarekTheme
 import kotlinx.coroutines.launch
 
 /**
- * The app's one window: the news reader and the radio/TV player live side by side as pages
+ * The app's one window: the news reader, radio/TV player and tools live as pages
  * of a [HorizontalPager] — swipe between them, tap the bottom navigation bar, or use the
  * navigation drawer (hamburger in either page's top bar), which also offers "close app".
  * Replaces the old three-activity setup (chooser -> MainActivity / PlayerActivity); the
@@ -61,7 +63,7 @@ class HomeActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-        requestedPage.intValue = intent?.getIntExtra(EXTRA_PAGE, PAGE_READER) ?: PAGE_READER
+        requestedPage.intValue = (intent?.getIntExtra(EXTRA_PAGE, PAGE_READER) ?: PAGE_READER).coerceIn(PAGE_READER, PAGE_TOOLS)
         val settings = SettingsStore(applicationContext)
         val repository = NewsRepository()
         setContent {
@@ -82,17 +84,18 @@ class HomeActivity : ComponentActivity() {
     // singleTop: a player-widget tap while the app is already open lands here, not in onCreate.
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
-        requestedPage.intValue = intent.getIntExtra(EXTRA_PAGE, requestedPage.intValue)
+        requestedPage.intValue = intent.getIntExtra(EXTRA_PAGE, requestedPage.intValue).coerceIn(PAGE_READER, PAGE_TOOLS)
     }
 
     companion object {
         const val EXTRA_PAGE = "com.kanarek.extra.PAGE"
         const val PAGE_READER = 0
         const val PAGE_PLAYER = 1
+        const val PAGE_TOOLS = 2
     }
 }
 
-private const val PAGE_COUNT = 2
+private const val PAGE_COUNT = 3
 
 @Composable
 private fun HomeShell(
@@ -143,6 +146,13 @@ private fun HomeShell(
                     label = { Text(stringResource(R.string.player_title)) },
                     selected = pagerState.currentPage == HomeActivity.PAGE_PLAYER,
                     onClick = { goTo(HomeActivity.PAGE_PLAYER) },
+                    modifier = Modifier.padding(horizontal = 12.dp),
+                )
+                NavigationDrawerItem(
+                    icon = { Icon(Icons.Filled.Build, contentDescription = null) },
+                    label = { Text(stringResource(R.string.tools_title)) },
+                    selected = pagerState.currentPage == HomeActivity.PAGE_TOOLS,
+                    onClick = { goTo(HomeActivity.PAGE_TOOLS) },
                     modifier = Modifier.padding(horizontal = 12.dp),
                 )
                 HorizontalDivider(Modifier.padding(vertical = 8.dp))
@@ -203,6 +213,12 @@ private fun HomeShell(
                         icon = { Icon(Icons.Filled.Radio, contentDescription = null) },
                         label = { Text(stringResource(R.string.player_title)) },
                     )
+                    NavigationBarItem(
+                        selected = pagerState.currentPage == HomeActivity.PAGE_TOOLS,
+                        onClick = { goTo(HomeActivity.PAGE_TOOLS) },
+                        icon = { Icon(Icons.Filled.Build, contentDescription = null) },
+                        label = { Text(stringResource(R.string.tools_title)) },
+                    )
                 }
             },
         ) { padding ->
@@ -227,7 +243,8 @@ private fun HomeShell(
                             isActive = pagerState.currentPage == HomeActivity.PAGE_READER,
                             onMenu = openMenu,
                         )
-                    else -> PlayerScreen(settings = settings, onMenu = openMenu)
+                    HomeActivity.PAGE_PLAYER -> PlayerScreen(settings = settings, onMenu = openMenu)
+                    HomeActivity.PAGE_TOOLS -> ToolsScreen(onMenu = openMenu)
                 }
             }
         }
