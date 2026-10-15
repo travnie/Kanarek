@@ -126,7 +126,7 @@ internal fun ToolsScreen(
                     }
                 }
             }
-        } else {
+        } else if (isActive) {
             BenchWebView(
                 bench = selected,
                 isActive = isActive,
@@ -206,7 +206,7 @@ private fun BenchWebView(
 
                 override fun onPermissionRequest(request: PermissionRequest) {
                     val origin = request.origin
-                    if (origin.scheme != "https" || origin.host != trustedOrigin.host ||
+                    if (bench != Bench.CODE || origin.scheme != "https" || origin.host != trustedOrigin.host ||
                         request.resources.toSet() != setOf(PermissionRequest.RESOURCE_VIDEO_CAPTURE)
                     ) {
                         request.deny()
