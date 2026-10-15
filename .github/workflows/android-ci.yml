@@ -63,7 +63,7 @@ jobs:
             :shared:testAndroidHostTest lintPlayDebug -Proborazzi.test.record=true --stacktrace
 
       - name: Upload debug APK
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: kanarek-debug-apk
           path: app/build/outputs/apk/*/debug/*.apk
@@ -71,7 +71,7 @@ jobs:
 
       - name: Upload JVM screenshots
         if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: kanarek-screenshots-jvm
           path: app/build/outputs/roborazzi/*.png
@@ -134,7 +134,7 @@ jobs:
 
       - name: Upload emulator screenshots
         if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: kanarek-screenshots-emulator
           path: out/
