@@ -20,6 +20,20 @@ class ScanPayloadTest {
         assertEquals(ScanKind.EVENT, ScanPayloadParser.parse("BEGIN:VEVENT\nSUMMARY:Meeting\nEND:VEVENT").kind)
     }
 
+    @Test fun commonQuickActionsRemainPreviews() {
+        assertEquals(ScanKind.EMAIL, ScanPayloadParser.parse("mailto:alice@example.org").kind)
+        assertEquals(ScanKind.PHONE, ScanPayloadParser.parse("tel:+48123123123").kind)
+        assertEquals(ScanKind.SMS, ScanPayloadParser.parse("sms:+48123123123?body=Hi").kind)
+        assertEquals(ScanKind.LOCATION, ScanPayloadParser.parse("geo:50.1,19.3").kind)
+        assertEquals(ScanKind.PLAYLIST, ScanPayloadParser.parse("#EXTM3U\\n#EXTINF:-1,Example").kind)
+    }
+
+    @Test fun suspiciousSchemesStayPlainText() {
+        for (source in listOf("javascript:alert(1)", "intent://scan/#Intent", "file:///etc/passwd", "content://com.example/file")) {
+            assertEquals(ScanKind.TEXT, ScanPayloadParser.parse(source).kind)
+        }
+    }
+
     @Test fun linksAndUnknowns() {
         assertEquals(ScanKind.WEB, ScanPayloadParser.parse("https://example.com").kind)
         assertEquals(ScanKind.PLAYLIST, ScanPayloadParser.parse("https://example.org/tv.m3u8").kind)
