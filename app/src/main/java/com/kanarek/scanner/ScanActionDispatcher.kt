@@ -61,6 +61,9 @@ object ScanActionDispatcher {
                 putExtra(CalendarContract.Events.TITLE, payload.fields["SUMMARY"].orEmpty())
                 putExtra(CalendarContract.Events.DESCRIPTION, payload.fields["DESCRIPTION"].orEmpty().take(1800))
                 putExtra(CalendarContract.Events.EVENT_LOCATION, payload.fields["LOCATION"].orEmpty())
+                if (payload.fields["DTSTART"]?.length == 8) {
+                    putExtra(CalendarContract.EXTRA_EVENT_ALL_DAY, true)
+                }
                 parseDate(payload.fields["DTSTART"], payload.fields["DTSTART_TZID"])?.let {
                     putExtra(CalendarContract.EXTRA_EVENT_BEGIN_TIME, it)
                 }
@@ -119,7 +122,8 @@ object ScanActionDispatcher {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R || ssid.isBlank() || ssid.length > 32) {
             return Intent(Settings.ACTION_WIFI_SETTINGS)
         }
-        val builder = WifiNetworkSuggestion.Builder().setSsid(ssid)
+        val hidden = payload.fields["H"].equals("true", ignoreCase = true)
+        val builder = WifiNetworkSuggestion.Builder().setSsid(ssid).setIsHiddenSsid(hidden)
         val valid = when (auth) {
             "", "NOPASS" -> pass.isEmpty()
             "WPA", "WPA2" -> pass.length in 8..63 && pass.all { it.code in 32..126 }

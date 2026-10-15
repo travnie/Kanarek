@@ -66,9 +66,7 @@ class HomeActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         requestedPage.intValue = (intent?.getIntExtra(EXTRA_PAGE, PAGE_READER) ?: PAGE_READER).coerceIn(PAGE_READER, PAGE_TOOLS)
-        if (savedInstanceState == null &&
-            ScanTileToken.consume(intent?.getStringExtra(EXTRA_SCAN_TOKEN))
-        ) {
+        if (ScanTileToken.consume(intent?.getStringExtra(EXTRA_SCAN_TOKEN))) {
             scanRequest.intValue++
         }
         val settings = SettingsStore(applicationContext)
