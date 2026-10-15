@@ -39,6 +39,9 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -151,6 +154,7 @@ private fun BenchWebView(
     onExit: () -> Unit,
 ) {
     val context = LocalContext.current
+    val lifecycleOwner = LocalLifecycleOwner.current
     val trustedOrigin = remember(bench) { Uri.parse(bench.url) }
     var fileCallback by remember { mutableStateOf<ValueCallback<Array<Uri>>?>(null) }
     var cameraRequest by remember { mutableStateOf<PermissionRequest?>(null) }
@@ -251,8 +255,18 @@ private fun BenchWebView(
     BackHandler {
         if (webView.canGoBack()) webView.goBack() else onExit()
     }
-    DisposableEffect(webView) {
+    DisposableEffect(webView, lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            when (event) {
+                Lifecycle.Event.ON_PAUSE -> webView.onPause()
+                Lifecycle.Event.ON_RESUME -> webView.onResume()
+                else -> Unit
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
         onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+            webView.onPause()
             fileCallback?.onReceiveValue(null)
             fileCallback = null
             cameraRequest?.deny()
