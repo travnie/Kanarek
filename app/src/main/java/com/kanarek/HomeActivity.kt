@@ -59,11 +59,15 @@ import kotlinx.coroutines.launch
  */
 class HomeActivity : ComponentActivity() {
     private val requestedPage = mutableIntStateOf(PAGE_READER)
+    private val scanRequest = mutableIntStateOf(0)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         requestedPage.intValue = (intent?.getIntExtra(EXTRA_PAGE, PAGE_READER) ?: PAGE_READER).coerceIn(PAGE_READER, PAGE_TOOLS)
+        if (savedInstanceState == null && intent?.getBooleanExtra(EXTRA_SCAN, false) == true) {
+            scanRequest.intValue++
+        }
         val settings = SettingsStore(applicationContext)
         val repository = NewsRepository()
         setContent {
@@ -75,6 +79,7 @@ class HomeActivity : ComponentActivity() {
                     repository = repository,
                     themeMode = themeMode,
                     requestedPage = requestedPage.intValue,
+                    scanRequest = scanRequest.intValue,
                     onCloseApp = { finishAffinity() },
                 )
             }
@@ -85,10 +90,12 @@ class HomeActivity : ComponentActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         requestedPage.intValue = intent.getIntExtra(EXTRA_PAGE, requestedPage.intValue).coerceIn(PAGE_READER, PAGE_TOOLS)
+        if (intent.getBooleanExtra(EXTRA_SCAN, false)) scanRequest.intValue++
     }
 
     companion object {
         const val EXTRA_PAGE = "com.kanarek.extra.PAGE"
+        const val EXTRA_SCAN = "com.kanarek.extra.SCAN"
         const val PAGE_READER = 0
         const val PAGE_PLAYER = 1
         const val PAGE_TOOLS = 2
@@ -103,6 +110,7 @@ private fun HomeShell(
     repository: NewsRepository,
     themeMode: AppThemeMode,
     requestedPage: Int,
+    scanRequest: Int,
     onCloseApp: () -> Unit,
 ) {
     val scope = rememberCoroutineScope()
@@ -248,6 +256,7 @@ private fun HomeShell(
                         ToolsScreen(
                             onMenu = openMenu,
                             isActive = pagerState.currentPage == HomeActivity.PAGE_TOOLS,
+                            scanRequest = scanRequest,
                         )
                 }
             }
