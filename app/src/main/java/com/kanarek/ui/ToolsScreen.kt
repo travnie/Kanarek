@@ -113,13 +113,14 @@ private enum class Bench(
 internal fun ToolsScreen(
     onMenu: () -> Unit,
     isActive: Boolean,
-    scanRequest: Int,
+    pendingScanRequest: Int,
+    onScanRequestConsumed: (Int) -> Unit,
 ) {
     var selectedKey by rememberSaveable { mutableStateOf<String?>(null) }
     val selected = Bench.entries.firstOrNull { it.name == selectedKey }
     var scanned by remember { mutableStateOf<ScanPayload?>(null) }
-    LaunchedEffect(scanRequest) {
-        if (scanRequest > 0) selectedKey = Bench.CODE.name
+    LaunchedEffect(pendingScanRequest) {
+        if (pendingScanRequest > 0) selectedKey = Bench.CODE.name
     }
 
     Scaffold(
@@ -177,7 +178,8 @@ internal fun ToolsScreen(
         } else if (isActive) {
             BenchWebView(
                 bench = selected,
-                scanRequest = scanRequest,
+                pendingScanRequest = pendingScanRequest,
+                onScanRequestConsumed = onScanRequestConsumed,
                 modifier = Modifier.fillMaxSize().padding(padding),
                 onExit = { selectedKey = null },
                 onScan = { scanned = it },
@@ -196,7 +198,8 @@ internal fun ToolsScreen(
 @Composable
 private fun BenchWebView(
     bench: Bench,
-    scanRequest: Int,
+    pendingScanRequest: Int,
+    onScanRequestConsumed: (Int) -> Unit,
     modifier: Modifier = Modifier,
     onExit: () -> Unit,
     onScan: (ScanPayload) -> Unit,
@@ -207,13 +210,16 @@ private fun BenchWebView(
     var fileCallback by remember { mutableStateOf<ValueCallback<Array<Uri>>?>(null) }
     var cameraRequest by remember { mutableStateOf<PermissionRequest?>(null) }
     var startedScanRequest by remember(bench) { mutableIntStateOf(0) }
-    val currentScanRequest by rememberUpdatedState(scanRequest)
+    val currentScanRequest by rememberUpdatedState(pendingScanRequest)
+    val currentConsume by rememberUpdatedState(onScanRequestConsumed)
 
     fun startCameraIfRequested(view: WebView?) {
+        val requested = currentScanRequest
         if (bench != Bench.CODE || view == null ||
-            currentScanRequest <= startedScanRequest || view.progress < 100
+            requested == 0 || requested <= startedScanRequest || view.progress < 100
         ) return
-        startedScanRequest = currentScanRequest
+        startedScanRequest = requested
+        currentConsume(requested)
         view.evaluateJavascript(
             "(function(){const start=document.getElementById('camStart');if(start&&!start.disabled)start.click();})();",
             null,
@@ -350,7 +356,7 @@ private fun BenchWebView(
     BackHandler {
         if (webView.canGoBack()) webView.goBack() else onExit()
     }
-    LaunchedEffect(scanRequest, webView) {
+    LaunchedEffect(pendingScanRequest, webView) {
         startCameraIfRequested(webView)
     }
     DisposableEffect(webView, lifecycleOwner) {

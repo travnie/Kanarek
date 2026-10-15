@@ -1,5 +1,6 @@
 package com.kanarek.scanner
 
+import android.annotation.SuppressLint
 import android.app.PendingIntent
 import android.content.Intent
 import android.os.Build
@@ -24,8 +25,13 @@ class ScanTileService : TileService() {
             )
             startActivityAndCollapse(pending)
         } else {
-            @Suppress("DEPRECATION")
-            startActivityAndCollapse(target)
+            openLegacyScanner(target)
         }
+    }
+
+    @SuppressLint("StartActivityAndCollapseDeprecated")
+    @Suppress("DEPRECATION")
+    private fun openLegacyScanner(target: Intent) {
+        startActivityAndCollapse(target)
     }
 }

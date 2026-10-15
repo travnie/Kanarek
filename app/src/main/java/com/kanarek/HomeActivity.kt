@@ -61,6 +61,7 @@ import kotlinx.coroutines.launch
 class HomeActivity : ComponentActivity() {
     private val requestedPage = mutableIntStateOf(PAGE_READER)
     private val scanRequest = mutableIntStateOf(0)
+    private val consumedScanRequest = mutableIntStateOf(0)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -80,7 +81,10 @@ class HomeActivity : ComponentActivity() {
                     repository = repository,
                     themeMode = themeMode,
                     requestedPage = requestedPage.intValue,
-                    scanRequest = scanRequest.intValue,
+                    pendingScanRequest = scanRequest.intValue.takeIf { it > consumedScanRequest.intValue } ?: 0,
+                    onScanRequestConsumed = { id ->
+                        if (id > consumedScanRequest.intValue) consumedScanRequest.intValue = id
+                    },
                     onCloseApp = { finishAffinity() },
                 )
             }
@@ -111,7 +115,8 @@ private fun HomeShell(
     repository: NewsRepository,
     themeMode: AppThemeMode,
     requestedPage: Int,
-    scanRequest: Int,
+    pendingScanRequest: Int,
+    onScanRequestConsumed: (Int) -> Unit,
     onCloseApp: () -> Unit,
 ) {
     val scope = rememberCoroutineScope()
@@ -257,7 +262,8 @@ private fun HomeShell(
                         ToolsScreen(
                             onMenu = openMenu,
                             isActive = pagerState.currentPage == HomeActivity.PAGE_TOOLS,
-                            scanRequest = scanRequest,
+                            pendingScanRequest = pendingScanRequest,
+                            onScanRequestConsumed = onScanRequestConsumed,
                         )
                 }
             }

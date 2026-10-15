@@ -19,9 +19,8 @@ internal object ScanTileToken {
 
     @Synchronized
     fun consume(candidate: String?): Boolean {
-        val accepted = candidate != null &&
-            candidate == value &&
-            SystemClock.elapsedRealtime() - issuedAt in 0..MAX_AGE_MS
+        if (candidate == null || candidate != value) return false
+        val accepted = SystemClock.elapsedRealtime() - issuedAt in 0..MAX_AGE_MS
         value = null
         issuedAt = 0
         return accepted
