@@ -94,7 +94,7 @@ object ScanPayloadParser {
     }
 
     private fun recordFields(source: String): Map<String, String> =
-        source.replace("\\r\\n", "\\n").lines().mapNotNull { line ->
+        source.replace("\r\n", "\n").lines().mapNotNull { line ->
             val colon = line.indexOf(':')
             if (colon <= 0) null else line.substring(0, colon).substringBefore(';').uppercase() to
                 line.substring(colon + 1).take(2000)

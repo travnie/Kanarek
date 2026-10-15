@@ -15,9 +15,9 @@ class ScanPayloadTest {
     }
 
     @Test fun contactAndCalendar() {
-        assertEquals(ScanKind.CONTACT, ScanPayloadParser.parse("BEGIN:VCARD\\nFN:Jane Doe\\nTEL:+123456789\\nEND:VCARD").kind)
+        assertEquals(ScanKind.CONTACT, ScanPayloadParser.parse("BEGIN:VCARD\nFN:Jane Doe\nTEL:+123456789\nEND:VCARD").kind)
         assertEquals(ScanKind.CONTACT, ScanPayloadParser.parse("MECARD:N:Jane;TEL:123;;").kind)
-        assertEquals(ScanKind.EVENT, ScanPayloadParser.parse("BEGIN:VEVENT\\nSUMMARY:Meeting\\nEND:VEVENT").kind)
+        assertEquals(ScanKind.EVENT, ScanPayloadParser.parse("BEGIN:VEVENT\nSUMMARY:Meeting\nEND:VEVENT").kind)
     }
 
     @Test fun linksAndUnknowns() {
