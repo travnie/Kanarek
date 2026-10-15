@@ -84,7 +84,7 @@
     <string name="tools_codebench_description">QR, barcodes and camera scanning</string>
     <string name="tools_docbench_description">Documents, PDFs and text files</string>
     <string name="tools_streambench_description">Stream diagnostics and playlist workshop</string>
-    <string name="tools_online_hint">Hosted preview · requires internet</string>
+    <string name="tools_online_hint">Hosted preview · online only · save before leaving</string>
     <string name="tools_open">Open</string>
     <string name="tools_back">Back to tools</string>
     <string name="settings">Settings</string>
