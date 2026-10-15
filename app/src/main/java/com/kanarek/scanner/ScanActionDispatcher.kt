@@ -33,8 +33,8 @@ object ScanActionDispatcher {
     fun open(context: Context, payload: ScanPayload): Boolean {
         val intent = when (payload.kind) {
             ScanKind.WIFI -> wifiIntent(payload)
-            ScanKind.CONTACT -> Intent(Intent.ACTION_INSERT, ContactsContract.Contacts.CONTENT_URI).apply {
-                type = ContactsContract.RawContacts.CONTENT_TYPE
+            ScanKind.CONTACT -> Intent(Intent.ACTION_INSERT).apply {
+                type = ContactsContract.Contacts.CONTENT_TYPE
                 putExtra(ContactsContract.Intents.Insert.NAME, payload.fields["FN"] ?: payload.fields["N"].orEmpty())
                 payload.fields["TEL"]?.let { putExtra(ContactsContract.Intents.Insert.PHONE, it) }
                 payload.fields["EMAIL"]?.let { putExtra(ContactsContract.Intents.Insert.EMAIL, it) }

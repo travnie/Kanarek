@@ -7,6 +7,7 @@ import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -56,6 +57,17 @@ internal fun ScanResultDialog(
                 Text(payload.summary)
                 Text(content)
                 Text("Review before proceeding. Nothing runs automatically.")
+                Row {
+                    TextButton(onClick = {
+                        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                        clipboard.setPrimaryClip(ClipData.newPlainText("Codebench scan", payload.raw))
+                        Toast.makeText(context, "Copied", Toast.LENGTH_SHORT).show()
+                    }) { Text("Copy") }
+                    TextButton(onClick = {
+                        pendingSave = payload.raw
+                        saveFile.launch("scan-" + payload.kind.name.lowercase() + ".txt")
+                    }) { Text("Save as text") }
+                }
             }
         },
         confirmButton = {
@@ -70,14 +82,4 @@ internal fun ScanResultDialog(
             TextButton(onClick = onDismiss) { Text("Close") }
         },
     )
-    // Actions outside the preview. Saving never modifies the scanned source.
-    androidx.compose.material3.Button(onClick = {
-        pendingSave = payload.raw
-        saveFile.launch("scan-" + payload.kind.name.lowercase() + ".txt")
-    }) { Text("Save to file") }
-    androidx.compose.material3.TextButton(onClick = {
-        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-        clipboard.setPrimaryClip(ClipData.newPlainText("Codebench scan", payload.raw))
-        Toast.makeText(context, "Copied", Toast.LENGTH_SHORT).show()
-    }) { Text("Copy") }
 }
