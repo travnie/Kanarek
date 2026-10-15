@@ -25,7 +25,7 @@ class ScanPayloadTest {
         assertEquals(ScanKind.PHONE, ScanPayloadParser.parse("tel:+48123123123").kind)
         assertEquals(ScanKind.SMS, ScanPayloadParser.parse("sms:+48123123123?body=Hi").kind)
         assertEquals(ScanKind.LOCATION, ScanPayloadParser.parse("geo:50.1,19.3").kind)
-        assertEquals(ScanKind.PLAYLIST, ScanPayloadParser.parse("#EXTM3U\\n#EXTINF:-1,Example").kind)
+        assertEquals(ScanKind.PLAYLIST, ScanPayloadParser.parse("#EXTM3U\n#EXTINF:-1,Example").kind)
     }
 
     @Test fun suspiciousSchemesStayPlainText() {
@@ -35,7 +35,7 @@ class ScanPayloadTest {
     }
 
     @Test fun repeatsPreservedForContactDraft() {
-        val result = ScanPayloadParser.parse("BEGIN:VCARD\\nFN:Jane\\nTEL:111\\nTEL:222\\nEMAIL:a@example.org\\nEMAIL:b@example.org\\nEND:VCARD")
+        val result = ScanPayloadParser.parse("BEGIN:VCARD\nFN:Jane\nTEL:111\nTEL:222\nEMAIL:a@example.org\nEMAIL:b@example.org\nEND:VCARD")
         assertEquals(ScanKind.CONTACT, result.kind)
         assertEquals("222", result.fields["TEL_2"])
         assertEquals("b@example.org", result.fields["EMAIL_2"])
