@@ -41,6 +41,9 @@ replace Streambench's allowlisted relay with an unrestricted proxy.
   permission. Block mixed content and external in-WebView navigation.
 - Hosted mode is a transitional preview: it requires a network connection;
   browser downloads and all workflows are not yet guaranteed inside WebView.
+  Switching away unloads the preview, including unsaved in-memory edits, to
+  stop hidden camera/media activity. Save or export first; this tradeoff can be
+  revisited when bundled sandboxes and native file state are implemented.
   Do not describe it as offline-capable or native-export-complete.
 - Build both `play` and `foss` variants, exercise navigation/back, picker,
   scanner permissions and offline reader/player regression checks.

@@ -1,6 +1,7 @@
 package com.kanarek.ui
 
 import android.Manifest
+import android.graphics.Bitmap
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
@@ -38,7 +39,6 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -54,6 +54,12 @@ import androidx.core.content.ContextCompat
 import com.kanarek.R
 
 // One native hub. Bench code remains owned by travnie/twojstar.
+private fun isTrustedOrigin(target: Uri, trusted: Uri): Boolean =
+    target.scheme == "https" &&
+        target.host?.equals(trusted.host, ignoreCase = true) == true &&
+        (if (target.port == -1) 443 else target.port) ==
+        (if (trusted.port == -1) 443 else trusted.port)
+
 private enum class Bench(
     val label: String,
     val summaryRes: Int,
@@ -129,7 +135,6 @@ internal fun ToolsScreen(
         } else if (isActive) {
             BenchWebView(
                 bench = selected,
-                isActive = isActive,
                 modifier = Modifier.fillMaxSize().padding(padding),
                 onExit = { selectedKey = null },
             )
@@ -142,7 +147,6 @@ internal fun ToolsScreen(
 @Composable
 private fun BenchWebView(
     bench: Bench,
-    isActive: Boolean,
     modifier: Modifier = Modifier,
     onExit: () -> Unit,
 ) {
@@ -178,11 +182,17 @@ private fun BenchWebView(
             webViewClient = object : WebViewClient() {
                 override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest?): Boolean {
                     val target = request?.url ?: return true
-                    if (target.scheme == "https" && target.host == trustedOrigin.host) return false
+                    if (isTrustedOrigin(target, trustedOrigin)) return false
                     if (request.isForMainFrame && target.scheme == "https") {
                         runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, target)) }
                     }
                     return true
+                }
+
+                // shouldOverrideUrlLoading is not called for POST navigation.
+                override fun onPageStarted(view: WebView?, url: String?, favicon: Bitmap?) {
+                    val target = url?.let(Uri::parse)
+                    if (target == null || !isTrustedOrigin(target, trustedOrigin)) view?.stopLoading()
                 }
             }
             webChromeClient = object : WebChromeClient() {
@@ -191,7 +201,14 @@ private fun BenchWebView(
                     filePathCallback: ValueCallback<Array<Uri>>?,
                     fileChooserParams: FileChooserParams?,
                 ): Boolean {
-                    fileCallback?.onReceiveValue(null)
+                    if (filePathCallback == null) return false
+                    val currentPage = webView?.url?.let(Uri::parse)
+                    if (fileCallback != null || currentPage == null ||
+                        !isTrustedOrigin(currentPage, trustedOrigin)
+                    ) {
+                        filePathCallback.onReceiveValue(null)
+                        return true
+                    }
                     fileCallback = filePathCallback
                     val chooser = fileChooserParams?.createIntent() ?: Intent(Intent.ACTION_GET_CONTENT).apply {
                         type = "*/*"
@@ -206,7 +223,7 @@ private fun BenchWebView(
 
                 override fun onPermissionRequest(request: PermissionRequest) {
                     val origin = request.origin
-                    if (bench != Bench.CODE || origin.scheme != "https" || origin.host != trustedOrigin.host ||
+                    if (bench != Bench.CODE || !isTrustedOrigin(origin, trustedOrigin) ||
                         request.resources.toSet() != setOf(PermissionRequest.RESOURCE_VIDEO_CAPTURE)
                     ) {
                         request.deny()
@@ -231,11 +248,8 @@ private fun BenchWebView(
         }
     }
 
-    BackHandler(enabled = isActive) {
+    BackHandler {
         if (webView.canGoBack()) webView.goBack() else onExit()
-    }
-    LaunchedEffect(webView, isActive) {
-        if (isActive) webView.onResume() else webView.onPause()
     }
     DisposableEffect(webView) {
         onDispose {
