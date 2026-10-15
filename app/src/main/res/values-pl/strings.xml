@@ -79,6 +79,14 @@
 
     <!-- Ekran startowy -->
     <string name="home_news">Wiadomości</string>
+    <string name="tools_title">Narzędzia</string>
+    <string name="tools_intro">Otwórz trzy narzędzia Bench w Kanarku. Ta pierwsza integracja korzysta z wersji online; paczki offline i natywny eksport pojawią się później.</string>
+    <string name="tools_codebench_description">Kody QR, kody kreskowe i skanowanie aparatem</string>
+    <string name="tools_docbench_description">Dokumenty, pliki PDF i pliki tekstowe</string>
+    <string name="tools_streambench_description">Diagnostyka strumieni i edytor playlist</string>
+    <string name="tools_online_hint">Podgląd online · zapisz pracę przed wyjściem</string>
+    <string name="tools_open">Otwórz</string>
+    <string name="tools_back">Wróć do narzędzi</string>
     <string name="settings">Ustawienia</string>
     <string name="menu">Menu</string>
     <string name="close_app">Zamknij aplikację</string>
