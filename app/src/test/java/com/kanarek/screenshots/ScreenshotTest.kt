@@ -75,11 +75,12 @@ class ScreenshotTest {
         Bitmap.createBitmap(1, 1, Bitmap.Config.ARGB_8888).copyPixelsToBuffer(java.nio.IntBuffer.allocate(1))
         ActivityScenario.launch(HomeActivity::class.java).use {
             idle()
-            if (index == HomeActivity.PAGE_PLAYER) {
+            if (index != HomeActivity.PAGE_READER) {
                 // Navigate like a user: under Robolectric a cold-start EXTRA_PAGE doesn't move the
                 // pager (it does on a device; the emulator job checks that).
                 // The bottom-bar tab; the closed drawer holds an off-screen twin.
-                val tabs = compose.onAllNodes(hasText(app.getString(R.string.player_title)) and hasClickAction())
+                val title = if (index == HomeActivity.PAGE_PLAYER) R.string.player_title else R.string.tools_title
+                val tabs = compose.onAllNodes(hasText(app.getString(title)) and hasClickAction())
                 val onScreen = tabs.fetchSemanticsNodes().indexOfFirst { it.boundsInRoot.left >= 0f }
                 tabs[onScreen].performClick()
                 idle()
@@ -98,6 +99,8 @@ class ScreenshotTest {
 
     @Test fun playerLight() = page(1, "player_light")
 
+    @Test fun toolsLight() = page(HomeActivity.PAGE_TOOLS, "tools_light")
+
     @Test
     @Config(qualifiers = "+night")
     fun readerDark() = page(0, "reader_dark")
@@ -107,12 +110,20 @@ class ScreenshotTest {
     fun playerDark() = page(1, "player_dark")
 
     @Test
+    @Config(qualifiers = "+night")
+    fun toolsDark() = page(HomeActivity.PAGE_TOOLS, "tools_dark")
+
+    @Test
     @Config(qualifiers = "w800dp-h1280dp-xhdpi")
     fun readerTablet() = page(0, "reader_tablet")
 
     @Test
     @Config(qualifiers = "w800dp-h1280dp-xhdpi")
     fun playerTablet() = page(1, "player_tablet")
+
+    @Test
+    @Config(qualifiers = "w800dp-h1280dp-xhdpi")
+    fun toolsTablet() = page(HomeActivity.PAGE_TOOLS, "tools_tablet")
 
     private fun capture(
         views: RemoteViews,

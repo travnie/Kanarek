@@ -18,7 +18,6 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -35,6 +34,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
@@ -151,27 +151,25 @@ internal fun ToolsScreen(
                         modifier = Modifier.padding(vertical = 12.dp),
                     )
                 }
+                item {
+                    Text(
+                        stringResource(R.string.tools_online_hint),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(bottom = 4.dp),
+                    )
+                }
                 items(Bench.entries) { bench ->
                     ElevatedCard(
                         onClick = { selectedKey = bench.name },
                         modifier = Modifier.fillMaxWidth(),
                     ) {
-                        Column {
-                            ListItem(
-                                leadingContent = {
-                                    Icon(bench.icon, contentDescription = null)
-                                },
-                                headlineContent = { Text(bench.label) },
-                                supportingContent = {
-                                    Text(stringResource(bench.summaryRes))
-                                },
-                                trailingContent = { Text(stringResource(R.string.tools_open)) },
-                            )
-                            Text(
-                                stringResource(R.string.tools_online_hint),
-                                modifier = Modifier.padding(start = 16.dp, bottom = 12.dp),
-                            )
-                        }
+                        ListItem(
+                            leadingContent = { Icon(bench.icon, contentDescription = null) },
+                            headlineContent = { Text(bench.label) },
+                            supportingContent = { Text(stringResource(bench.summaryRes)) },
+                            trailingContent = { Text(stringResource(R.string.tools_open)) },
+                        )
                     }
                 }
             }
