@@ -15,6 +15,11 @@ class IncomingBenchFilesTest {
         assertEquals(BenchFileTarget.STREAM, IncomingBenchFiles.classify("list.bin", "audio/x-mpegurl"))
     }
 
+    @Test fun formatsNotParsedByStreambenchStayRawDocuments() {
+        assertEquals(BenchFileTarget.DOC, IncomingBenchFiles.classify("radio.pls", "text/plain"))
+        assertEquals(BenchFileTarget.DOC, IncomingBenchFiles.classify("channels.xspf", "application/xml"))
+    }
+
     @Test fun documentsRouteToDocbench() {
         for (filename in listOf("script.sh", ".env", "notes.md", "data.json", "book.pdf", "draft.docx")) {
             assertEquals(BenchFileTarget.DOC, IncomingBenchFiles.classify(filename, "application/octet-stream"))

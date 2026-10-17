@@ -42,8 +42,8 @@ object IncomingBenchFiles {
     fun classify(filename: String, mime: String): BenchFileTarget {
         val name = filename.lowercase()
         val media = mime.lowercase().substringBefore(';')
-        if (name.endsWith(".m3u") || name.endsWith(".m3u8") || name.endsWith(".pls") ||
-            name.endsWith(".xspf") || name.endsWith(".xmltv") ||
+        if (name.endsWith(".m3u") || name.endsWith(".m3u8") ||
+            name.endsWith(".xmltv") ||
             media in setOf("application/vnd.apple.mpegurl", "application/x-mpegurl",
                 "audio/x-mpegurl", "audio/mpegurl")
         ) return BenchFileTarget.STREAM
@@ -58,11 +58,11 @@ object IncomingBenchFiles {
     @Suppress("DEPRECATION")
     fun fromIntent(intent: Intent?, resolver: ContentResolver): IncomingBenchFile? {
         if (intent == null || intent.action !in setOf(Intent.ACTION_VIEW, Intent.ACTION_SEND)) return null
-        val uri = if (intent.action == Intent.ACTION_VIEW) intent.data else {
+        val uri = (if (intent.action == Intent.ACTION_VIEW) intent.data else {
             if (Build.VERSION.SDK_INT >= 33) {
                 intent.getParcelableExtra(Intent.EXTRA_STREAM, Uri::class.java)
             } else intent.getParcelableExtra(Intent.EXTRA_STREAM) as? Uri
-        } ?: return null
+        }) ?: intent.clipData?.takeIf { it.itemCount > 0 }?.getItemAt(0)?.uri ?: return null
         // No file://, network URL, or arbitrary paths. The sender grants access
         // to the user-selected content:// URI only.
         if (uri.scheme != ContentResolver.SCHEME_CONTENT) return null
@@ -82,7 +82,8 @@ object IncomingBenchFiles {
             .substringAfterLast('/').substringAfterLast('\\')
             .replace(Regex("[\\u0000-\\u001F\\u007F]"), "")
             .take(150).ifBlank { "document" }
-        val mime = resolver.getType(uri) ?: intent.type ?: "application/octet-stream"
+        val mime = runCatching { resolver.getType(uri) }.getOrNull()
+            ?: intent.type ?: "application/octet-stream"
         return IncomingBenchFile(nextId.incrementAndGet(), uri, safeName, mime, size, classify(safeName, mime))
     }
 
@@ -120,7 +121,17 @@ object IncomingBenchFiles {
                 else -> "file-input"
             }
         }
-        val safeMime = payload.mime.takeIf {
+        val extensionMime = if (payload.target == BenchFileTarget.CODE) {
+            when (payload.filename.substringAfterLast('.', "").lowercase()) {
+                "jpg", "jpeg" -> "image/jpeg"
+                "png" -> "image/png"
+                "webp" -> "image/webp"
+                "gif" -> "image/gif"
+                "svg" -> "image/svg+xml"
+                else -> null
+            }
+        } else null
+        val safeMime = (extensionMime ?: payload.mime).takeIf {
             it.length <= 100 && it.matches(Regex("[A-Za-z0-9.+_/-]+"))
         } ?: "application/octet-stream"
         val encoded = Base64.encodeToString(payload.bytes, Base64.NO_WRAP)
