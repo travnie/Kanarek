@@ -42,6 +42,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.lifecycleScope
 import com.kanarek.data.AppThemeMode
 import com.kanarek.scanner.ScanTileToken
 import com.kanarek.files.IncomingBenchFile
@@ -53,6 +54,8 @@ import com.kanarek.ui.ReaderScreen
 import com.kanarek.ui.ToolsScreen
 import com.kanarek.ui.theme.KanarekTheme
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 /**
  * The app's one window: the news reader, radio/TV player and tools live as pages
@@ -66,6 +69,20 @@ class HomeActivity : ComponentActivity() {
     private val scanRequest = mutableIntStateOf(0)
     private val consumedScanRequest = mutableIntStateOf(0)
     private val inboundFile = mutableStateOf<IncomingBenchFile?>(null)
+    private val queuedFiles = ArrayDeque<IncomingBenchFile>()
+
+    private fun receiveExternalFile(external: Intent?) {
+        if (external?.action != Intent.ACTION_VIEW && external?.action != Intent.ACTION_SEND) return
+        // Content providers are untrusted and may be slow. Never query on the UI thread.
+        lifecycleScope.launch {
+            val parsed = withContext(Dispatchers.IO) {
+                IncomingBenchFiles.fromIntent(external, contentResolver)
+            } ?: return@launch
+            if (inboundFile.value == null) inboundFile.value = parsed
+            else queuedFiles.addLast(parsed)
+            requestedPage.intValue = PAGE_TOOLS
+        }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -74,10 +91,7 @@ class HomeActivity : ComponentActivity() {
         if (ScanTileToken.consume(intent?.getStringExtra(EXTRA_SCAN_TOKEN))) {
             scanRequest.intValue++
         }
-        IncomingBenchFiles.fromIntent(intent, contentResolver)?.let { file ->
-            inboundFile.value = file
-            requestedPage.intValue = PAGE_TOOLS
-        }
+        receiveExternalFile(intent)
         val settings = SettingsStore(applicationContext)
         val repository = NewsRepository()
         setContent {
@@ -93,9 +107,11 @@ class HomeActivity : ComponentActivity() {
                     inboundFile = inboundFile.value,
                     onFileHandled = { id ->
                         if (inboundFile.value?.id == id) {
-                            inboundFile.value = null
-                            // Do not replay a consumed VIEW/SEND intent after process recreation.
-                            if (intent?.action in setOf(Intent.ACTION_VIEW, Intent.ACTION_SEND)) {
+                            inboundFile.value = if (queuedFiles.isEmpty()) null else queuedFiles.removeFirst()
+                            // Do not replay consumed VIEW/SEND intents after process recreation.
+                            if (inboundFile.value == null &&
+                                intent?.action in setOf(Intent.ACTION_VIEW, Intent.ACTION_SEND)
+                            ) {
                                 setIntent(Intent(this, HomeActivity::class.java).apply {
                                     action = Intent.ACTION_MAIN
                                 })
@@ -116,10 +132,7 @@ class HomeActivity : ComponentActivity() {
         super.onNewIntent(intent)
         requestedPage.intValue = intent.getIntExtra(EXTRA_PAGE, requestedPage.intValue).coerceIn(PAGE_READER, PAGE_TOOLS)
         if (ScanTileToken.consume(intent.getStringExtra(EXTRA_SCAN_TOKEN))) scanRequest.intValue++
-        IncomingBenchFiles.fromIntent(intent, contentResolver)?.let { file ->
-            inboundFile.value = file
-            requestedPage.intValue = PAGE_TOOLS
-        }
+        receiveExternalFile(intent)
         setIntent(intent)
     }
 
