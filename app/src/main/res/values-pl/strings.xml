@@ -187,4 +187,10 @@
     <string name="seed_samples">Wczytaj przykładowe stacje</string>
     <string name="video_fullscreen_enter">Pełny ekran</string>
     <string name="video_fullscreen_exit">Zamknij pełny ekran</string>
+    <string name="open_with_title">Otwórz plik w Kanarku</string>
+    <string name="open_with_privacy">Wybierz Bench. Po potwierdzeniu jego skrypty online odczytają plik w WebView. Kanarek go nie wysyła. Import online ma limit 4 MB.</string>
+    <string name="open_with_cancel">Anuluj</string>
+    <string name="open_with_loading">Odczytywanie pliku…</string>
+    <string name="open_with_failed">Nie udało się przekazać pliku. Można go otworzyć ręcznie przez systemowy wybór plików w Bench.</string>
+    <string name="open_with_failed_title">Nie zaimportowano pliku</string>
 </resources>

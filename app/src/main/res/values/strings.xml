@@ -189,4 +189,10 @@
     <string name="seed_samples">Load sample stations</string>
     <string name="video_fullscreen_enter">Fullscreen</string>
     <string name="video_fullscreen_exit">Exit fullscreen</string>
+    <string name="open_with_title">Open file with Kanarek</string>
+    <string name="open_with_privacy">Choose a Bench. Its hosted scripts will read the selected file in the WebView after your confirmation. Kanarek does not upload it. Hosted import is limited to 4 MB.</string>
+    <string name="open_with_cancel">Cancel</string>
+    <string name="open_with_loading">Reading local file…</string>
+    <string name="open_with_failed">Could not hand over this file. You can open it manually with the Bench file picker.</string>
+    <string name="open_with_failed_title">File not imported</string>
 </resources>
