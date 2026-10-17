@@ -131,6 +131,7 @@ internal fun ToolsScreen(
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+    val importFailureMessage = stringResource(R.string.open_with_failed)
     var openingFile by remember { mutableStateOf(false) }
     var fileError by remember { mutableStateOf<String?>(null) }
     var preparedFile by remember { mutableStateOf<PreparedBenchFile?>(null) }
@@ -216,7 +217,7 @@ internal fun ToolsScreen(
                     preparedFile?.let { onFileHandled(it.id) }
                     preparedFile = null
                     processingFileId = null
-                    if (!imported) fileError = context.getString(R.string.open_with_failed)
+                    if (!imported) fileError = importFailureMessage
                 },
             )
         }
@@ -249,7 +250,7 @@ internal fun ToolsScreen(
                                         preparedFile = ready
                                         selectedKey = target.name
                                     } catch (error: Exception) {
-                                        fileError = error.localizedMessage ?: context.getString(R.string.open_with_failed)
+                                        fileError = error.localizedMessage ?: importFailureMessage
                                         processingFileId = null
                                         onFileHandled(source.id)
                                     } finally {
