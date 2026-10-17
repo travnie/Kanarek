@@ -134,11 +134,15 @@ internal fun ToolsScreen(
     var openingFile by remember { mutableStateOf(false) }
     var fileError by remember { mutableStateOf<String?>(null) }
     var preparedFile by remember { mutableStateOf<PreparedBenchFile?>(null) }
+    var processingFileId by remember { mutableStateOf<Long?>(null) }
     var selectedKey by rememberSaveable { mutableStateOf<String?>(null) }
     val selected = Bench.entries.firstOrNull { it.name == selectedKey }
     var scanned by remember { mutableStateOf<ScanPayload?>(null) }
-    LaunchedEffect(pendingScanRequest) {
-        if (pendingScanRequest > 0) selectedKey = Bench.CODE.name
+    LaunchedEffect(pendingScanRequest, inboundFile?.id, processingFileId) {
+        // A file import in progress owns the page until it is delivered.
+        if (pendingScanRequest > 0 && inboundFile == null &&
+            processingFileId == null && preparedFile == null
+        ) selectedKey = Bench.CODE.name
     }
 
     Scaffold(
@@ -201,24 +205,32 @@ internal fun ToolsScreen(
                 onScanRequestConsumed = onScanRequestConsumed,
                 modifier = Modifier.fillMaxSize().padding(padding),
                 onExit = {
+                    preparedFile?.let { onFileHandled(it.id) }
                     preparedFile = null
+                    processingFileId = null
                     selectedKey = null
                 },
                 onScan = { scanned = it },
                 incomingFile = preparedFile?.takeIf { it.target.name == benchKey(selected) },
                 onFileImported = { imported ->
+                    preparedFile?.let { onFileHandled(it.id) }
                     preparedFile = null
+                    processingFileId = null
                     if (!imported) fileError = context.getString(R.string.open_with_failed)
                 },
             )
         }
     }
     if (isActive) {
-        inboundFile?.let { source ->
+        inboundFile?.takeIf { it.id != processingFileId }?.let { source ->
             val options = when (source.suggested) {
                 BenchFileTarget.CODE -> listOf(BenchFileTarget.CODE)
                 BenchFileTarget.STREAM -> listOf(BenchFileTarget.STREAM, BenchFileTarget.DOC)
-                BenchFileTarget.DOC -> listOf(BenchFileTarget.DOC)
+                BenchFileTarget.DOC -> if (source.filename.endsWith(".xml", true) ||
+                    source.mime.equals("application/xml", true) ||
+                    source.mime.equals("text/xml", true)
+                ) listOf(BenchFileTarget.DOC, BenchFileTarget.STREAM)
+                else listOf(BenchFileTarget.DOC)
             }
             AlertDialog(
                 onDismissRequest = { onFileHandled(source.id) },
@@ -229,7 +241,7 @@ internal fun ToolsScreen(
                         Text(stringResource(R.string.open_with_privacy))
                         options.forEach { target ->
                             TextButton(onClick = {
-                                onFileHandled(source.id)
+                                processingFileId = source.id
                                 scope.launch {
                                     openingFile = true
                                     try {
@@ -238,6 +250,8 @@ internal fun ToolsScreen(
                                         selectedKey = target.name
                                     } catch (error: Exception) {
                                         fileError = error.localizedMessage ?: context.getString(R.string.open_with_failed)
+                                        processingFileId = null
+                                        onFileHandled(source.id)
                                     } finally {
                                         openingFile = false
                                     }
@@ -410,6 +424,9 @@ private fun BenchWebView(
                 }
             }
             webChromeClient = object : WebChromeClient() {
+                override fun onProgressChanged(view: WebView?, newProgress: Int) {
+                    if (newProgress == 100) deliverFileIfReady(view)
+                }
                 override fun onShowFileChooser(
                     webView: WebView?,
                     filePathCallback: ValueCallback<Array<Uri>>?,
