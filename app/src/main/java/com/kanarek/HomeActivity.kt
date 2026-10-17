@@ -92,7 +92,15 @@ class HomeActivity : ComponentActivity() {
                     pendingScanRequest = scanRequest.intValue.takeIf { it > consumedScanRequest.intValue } ?: 0,
                     inboundFile = inboundFile.value,
                     onFileHandled = { id ->
-                        if (inboundFile.value?.id == id) inboundFile.value = null
+                        if (inboundFile.value?.id == id) {
+                            inboundFile.value = null
+                            // Do not replay a consumed VIEW/SEND intent after process recreation.
+                            if (intent?.action in setOf(Intent.ACTION_VIEW, Intent.ACTION_SEND)) {
+                                setIntent(Intent(this, HomeActivity::class.java).apply {
+                                    action = Intent.ACTION_MAIN
+                                })
+                            }
+                        }
                     },
                     onScanRequestConsumed = { id ->
                         if (id > consumedScanRequest.intValue) consumedScanRequest.intValue = id

@@ -18,11 +18,12 @@ enum class BenchFileTarget { CODE, DOC, STREAM }
 
 data class IncomingBenchFile(
     val id: Long,
-    val uri: Uri,
+    val uri: Uri?,
     val filename: String,
     val mime: String,
     val size: Long?,
     val suggested: BenchFileTarget,
+    val inlineText: String? = null,
 )
 
 data class PreparedBenchFile(
@@ -62,7 +63,17 @@ object IncomingBenchFiles {
             if (Build.VERSION.SDK_INT >= 33) {
                 intent.getParcelableExtra(Intent.EXTRA_STREAM, Uri::class.java)
             } else intent.getParcelableExtra(Intent.EXTRA_STREAM) as? Uri
-        }) ?: intent.clipData?.takeIf { it.itemCount > 0 }?.getItemAt(0)?.uri ?: return null
+        }) ?: intent.clipData?.takeIf { it.itemCount > 0 }?.getItemAt(0)?.uri
+        if (uri == null && intent.action == Intent.ACTION_SEND && intent.type?.startsWith("text/") == true) {
+            val sharedText = intent.getCharSequenceExtra(Intent.EXTRA_TEXT)?.toString()?.takeIf {
+                it.isNotBlank() && it.toByteArray(Charsets.UTF_8).size <= MAX_PREVIEW_BYTES
+            } ?: return null
+            return IncomingBenchFile(
+                nextId.incrementAndGet(), null, "shared-text.txt", "text/plain",
+                sharedText.toByteArray(Charsets.UTF_8).size.toLong(), BenchFileTarget.DOC, sharedText,
+            )
+        }
+        if (uri == null) return null
         // No file://, network URL, or arbitrary paths. The sender grants access
         // to the user-selected content:// URI only.
         if (uri.scheme != ContentResolver.SCHEME_CONTENT) return null
@@ -92,8 +103,15 @@ object IncomingBenchFiles {
             if (source.size != null && source.size > MAX_PREVIEW_BYTES) {
                 throw IOException("File exceeds the 4 MB preview limit. Open it using the Bench file picker.")
             }
+            val textBytes = source.inlineText?.toByteArray(Charsets.UTF_8)
+            if (textBytes != null) {
+                return@withContext PreparedBenchFile(
+                    source.id, source.filename, source.mime, textBytes, target,
+                )
+            }
             val output = ByteArrayOutputStream()
-            val stream = context.contentResolver.openInputStream(source.uri)
+            val uri = source.uri ?: throw IOException("Missing document URI.")
+            val stream = context.contentResolver.openInputStream(uri)
                 ?: throw IOException("Could not open the selected document.")
             stream.use { input ->
                 val chunk = ByteArray(32 * 1024)

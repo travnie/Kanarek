@@ -65,8 +65,10 @@ replace Streambench's allowlisted relay with an unrestricted proxy.
 
 First pass on `feat/open-with-benches`:
 
-- Android `ACTION_VIEW` / `ACTION_SEND` now accepts user-shared `content://`
-  file grants and shows a native route chooser. No broad storage access.
+- Android `ACTION_VIEW` / `ACTION_SEND` accepts user-shared `content://`
+  file grants and shows a native route chooser. Plain-text shares without file
+  streams are handled as temporary text documents. No broad storage access.
+  Consumed intents are cleared so recreation does not replay imports.
 - Images route to Codebench's existing decode input, text/config files to
   Docbench's document input, playlists to Streambench's playlist input;
   playlists can also be opened as raw text in Docbench.

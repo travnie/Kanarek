@@ -68,6 +68,7 @@
                 <data android:mimeType="audio/x-mpegurl" />
                 <data android:mimeType="audio/mpegurl" />
                 <data android:mimeType="audio/x-scpls" />
+                <data android:scheme="content" />
             </intent-filter>
             <intent-filter>
                 <action android:name="android.intent.action.SEND" />
@@ -81,6 +82,10 @@
                 <data android:mimeType="application/vnd.openxmlformats-officedocument.wordprocessingml.document" />
                 <data android:mimeType="application/vnd.apple.mpegurl" />
                 <data android:mimeType="application/x-mpegurl" />
+                <data android:mimeType="audio/x-mpegurl" />
+                <data android:mimeType="audio/mpegurl" />
+                <data android:mimeType="audio/x-scpls" />
+                <data android:scheme="content" />
             </intent-filter>
         </activity>
 
