@@ -36,6 +36,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
@@ -43,6 +44,8 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.kanarek.data.AppThemeMode
 import com.kanarek.scanner.ScanTileToken
+import com.kanarek.files.IncomingBenchFile
+import com.kanarek.files.IncomingBenchFiles
 import com.kanarek.data.NewsRepository
 import com.kanarek.data.SettingsStore
 import com.kanarek.ui.PlayerScreen
@@ -62,6 +65,7 @@ class HomeActivity : ComponentActivity() {
     private val requestedPage = mutableIntStateOf(PAGE_READER)
     private val scanRequest = mutableIntStateOf(0)
     private val consumedScanRequest = mutableIntStateOf(0)
+    private val inboundFile = mutableStateOf<IncomingBenchFile?>(null)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -69,6 +73,10 @@ class HomeActivity : ComponentActivity() {
         requestedPage.intValue = (intent?.getIntExtra(EXTRA_PAGE, PAGE_READER) ?: PAGE_READER).coerceIn(PAGE_READER, PAGE_TOOLS)
         if (ScanTileToken.consume(intent?.getStringExtra(EXTRA_SCAN_TOKEN))) {
             scanRequest.intValue++
+        }
+        IncomingBenchFiles.fromIntent(intent, contentResolver)?.let { file ->
+            inboundFile.value = file
+            requestedPage.intValue = PAGE_TOOLS
         }
         val settings = SettingsStore(applicationContext)
         val repository = NewsRepository()
@@ -82,6 +90,10 @@ class HomeActivity : ComponentActivity() {
                     themeMode = themeMode,
                     requestedPage = requestedPage.intValue,
                     pendingScanRequest = scanRequest.intValue.takeIf { it > consumedScanRequest.intValue } ?: 0,
+                    inboundFile = inboundFile.value,
+                    onFileHandled = { id ->
+                        if (inboundFile.value?.id == id) inboundFile.value = null
+                    },
                     onScanRequestConsumed = { id ->
                         if (id > consumedScanRequest.intValue) consumedScanRequest.intValue = id
                     },
@@ -96,6 +108,11 @@ class HomeActivity : ComponentActivity() {
         super.onNewIntent(intent)
         requestedPage.intValue = intent.getIntExtra(EXTRA_PAGE, requestedPage.intValue).coerceIn(PAGE_READER, PAGE_TOOLS)
         if (ScanTileToken.consume(intent.getStringExtra(EXTRA_SCAN_TOKEN))) scanRequest.intValue++
+        IncomingBenchFiles.fromIntent(intent, contentResolver)?.let { file ->
+            inboundFile.value = file
+            requestedPage.intValue = PAGE_TOOLS
+        }
+        setIntent(intent)
     }
 
     companion object {
@@ -117,6 +134,8 @@ private fun HomeShell(
     requestedPage: Int,
     pendingScanRequest: Int,
     onScanRequestConsumed: (Int) -> Unit,
+    inboundFile: IncomingBenchFile?,
+    onFileHandled: (Long) -> Unit,
     onCloseApp: () -> Unit,
 ) {
     val scope = rememberCoroutineScope()
@@ -124,7 +143,7 @@ private fun HomeShell(
     val pagerState = rememberPagerState(initialPage = requestedPage) { PAGE_COUNT }
 
     // External page requests (widget deep-link via onNewIntent) steer the pager.
-    LaunchedEffect(requestedPage, pendingScanRequest) {
+    LaunchedEffect(requestedPage, pendingScanRequest, inboundFile?.id) {
         // A second Tile tap may target Tools while requestedPage already equals PAGE_TOOLS.
         if (pagerState.currentPage != requestedPage) pagerState.animateScrollToPage(requestedPage)
     }
@@ -265,6 +284,8 @@ private fun HomeShell(
                             isActive = pagerState.currentPage == HomeActivity.PAGE_TOOLS,
                             pendingScanRequest = pendingScanRequest,
                             onScanRequestConsumed = onScanRequestConsumed,
+                            inboundFile = inboundFile,
+                            onFileHandled = onFileHandled,
                         )
                 }
             }
