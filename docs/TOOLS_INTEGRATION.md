@@ -63,6 +63,26 @@ replace Streambench's allowlisted relay with an unrestricted proxy.
 
 ### 3. Native file and sharing contract
 
+First pass on `feat/open-with-benches`:
+
+- Android `ACTION_VIEW` / `ACTION_SEND` now accepts user-shared `content://`
+  file grants and shows a native route chooser. No broad storage access.
+- Images route to Codebench's existing decode input, text/config files to
+  Docbench's document input, playlists to Streambench's playlist input;
+  playlists can also be opened as raw text in Docbench.
+- The hosted preview loads at most 4 MiB in memory, passes base64-encoded data
+  only into the selected first-party HTTPS origin after explicit confirmation,
+  then drops the temporary data. No backend upload is performed by Kanarek;
+  the hosted page itself remains part of the user's trust decision.
+- PDF and DOCX have dedicated Docbench inputs for small previews. Larger files
+  and files unsupported by the Android MIME chooser still use Bench's own
+  system picker. Robust large-file/offline handoff requires bundled assets and
+  native document streams.
+- The original file is read-only during import. Changes in the Bench are not
+  silently written back to the source URI; export/save is a separate action.
+
+
+
 - Android Storage Access Framework for open/create/save without blanket disk
   permission. Support `ACTION_SEND` / `ACTION_VIEW` and document URI grants.
 - A versioned, typed and explicitly allowlisted bridge between *bundled*

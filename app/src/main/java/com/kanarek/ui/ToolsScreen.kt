@@ -18,6 +18,8 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -30,6 +32,9 @@ import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material.icons.filled.Tv
 import androidx.compose.material3.ElevatedCard
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -48,6 +53,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -60,9 +66,14 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import androidx.webkit.WebViewCompat
 import androidx.webkit.WebViewFeature
+import com.kanarek.files.BenchFileTarget
+import com.kanarek.files.IncomingBenchFile
+import com.kanarek.files.IncomingBenchFiles
+import com.kanarek.files.PreparedBenchFile
 import com.kanarek.data.ScanPayload
 import com.kanarek.data.ScanPayloadParser
 import com.kanarek.R
+import kotlinx.coroutines.launch
 
 // One native hub. Bench code remains owned by travnie/twojstar.
 // Observe Codebench's visible scan history, not third-party pages or page data.
@@ -115,7 +126,14 @@ internal fun ToolsScreen(
     isActive: Boolean,
     pendingScanRequest: Int,
     onScanRequestConsumed: (Int) -> Unit,
+    inboundFile: IncomingBenchFile?,
+    onFileHandled: (Long) -> Unit,
 ) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var openingFile by remember { mutableStateOf(false) }
+    var fileError by remember { mutableStateOf<String?>(null) }
+    var preparedFile by remember { mutableStateOf<PreparedBenchFile?>(null) }
     var selectedKey by rememberSaveable { mutableStateOf<String?>(null) }
     val selected = Bench.entries.firstOrNull { it.name == selectedKey }
     var scanned by remember { mutableStateOf<ScanPayload?>(null) }
@@ -161,7 +179,10 @@ internal fun ToolsScreen(
                 }
                 items(Bench.entries) { bench ->
                     ElevatedCard(
-                        onClick = { selectedKey = bench.name },
+                        onClick = {
+                            preparedFile = null
+                            selectedKey = bench.name
+                        },
                         modifier = Modifier.fillMaxWidth(),
                     ) {
                         ListItem(
@@ -179,17 +200,88 @@ internal fun ToolsScreen(
                 pendingScanRequest = pendingScanRequest,
                 onScanRequestConsumed = onScanRequestConsumed,
                 modifier = Modifier.fillMaxSize().padding(padding),
-                onExit = { selectedKey = null },
+                onExit = {
+                    preparedFile = null
+                    selectedKey = null
+                },
                 onScan = { scanned = it },
+                incomingFile = preparedFile?.takeIf { it.target.name == benchKey(selected) },
+                onFileImported = { imported ->
+                    preparedFile = null
+                    if (!imported) fileError = context.getString(R.string.open_with_failed)
+                },
             )
         }
     }
     if (isActive) {
+        inboundFile?.let { source ->
+            val options = when (source.suggested) {
+                BenchFileTarget.CODE -> listOf(BenchFileTarget.CODE)
+                BenchFileTarget.STREAM -> listOf(BenchFileTarget.STREAM, BenchFileTarget.DOC)
+                BenchFileTarget.DOC -> listOf(BenchFileTarget.DOC)
+            }
+            AlertDialog(
+                onDismissRequest = { onFileHandled(source.id) },
+                title = { Text(stringResource(R.string.open_with_title)) },
+                text = {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text(source.filename)
+                        Text(stringResource(R.string.open_with_privacy))
+                        options.forEach { target ->
+                            TextButton(onClick = {
+                                onFileHandled(source.id)
+                                scope.launch {
+                                    openingFile = true
+                                    try {
+                                        val ready = IncomingBenchFiles.prepare(context, source, target)
+                                        preparedFile = ready
+                                        selectedKey = target.name
+                                    } catch (error: Exception) {
+                                        fileError = error.localizedMessage ?: context.getString(R.string.open_with_failed)
+                                    } finally {
+                                        openingFile = false
+                                    }
+                                }
+                            }) {
+                                Text(target.name.lowercase().replaceFirstChar { it.uppercase() } + "bench")
+                            }
+                        }
+                    }
+                },
+                confirmButton = {
+                    TextButton(onClick = { onFileHandled(source.id) }) {
+                        Text(stringResource(R.string.open_with_cancel))
+                    }
+                },
+            )
+        }
+        if (openingFile) {
+            AlertDialog(
+                onDismissRequest = {},
+                title = { Text(stringResource(R.string.open_with_loading)) },
+                text = { CircularProgressIndicator() },
+                confirmButton = {},
+            )
+        }
+        fileError?.let { message ->
+            AlertDialog(
+                onDismissRequest = { fileError = null },
+                title = { Text(stringResource(R.string.open_with_failed_title)) },
+                text = { Text(message) },
+                confirmButton = {
+                    TextButton(onClick = { fileError = null }) {
+                        Text(stringResource(R.string.open_with_cancel))
+                    }
+                },
+            )
+        }
         scanned?.let { payload ->
             ScanResultDialog(payload = payload, onDismiss = { scanned = null })
         }
     }
 }
+
+private fun benchKey(bench: Bench): String = bench.name
 
 // Only Codebench's pinned HTTPS origin can report scanned text. No remote
 // page can invoke Android actions through the bridge.
@@ -201,6 +293,8 @@ private fun BenchWebView(
     modifier: Modifier = Modifier,
     onExit: () -> Unit,
     onScan: (ScanPayload) -> Unit,
+    incomingFile: PreparedBenchFile?,
+    onFileImported: (Boolean) -> Unit,
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -210,6 +304,22 @@ private fun BenchWebView(
     var startedScanRequest by remember(bench) { mutableIntStateOf(0) }
     val currentScanRequest by rememberUpdatedState(pendingScanRequest)
     val currentConsume by rememberUpdatedState(onScanRequestConsumed)
+    val currentFile by rememberUpdatedState(incomingFile)
+    val currentImportFinished by rememberUpdatedState(onFileImported)
+    var dispatchedFileId by remember(bench) { mutableStateOf<Long?>(null) }
+
+    fun deliverFileIfReady(view: WebView?) {
+        val incoming = currentFile ?: return
+        if (view == null || view.progress < 100 ||
+            incoming.target.name != bench.name || dispatchedFileId == incoming.id
+        ) return
+        val currentUrl = view.url?.let(Uri::parse) ?: return
+        if (!isTrustedOrigin(currentUrl, trustedOrigin)) return
+        dispatchedFileId = incoming.id
+        view.evaluateJavascript(IncomingBenchFiles.importJavascript(incoming)) { result ->
+            currentImportFinished(result?.trim() == "true")
+        }
+    }
 
     fun startCameraIfRequested(view: WebView?) {
         val requested = currentScanRequest
@@ -283,6 +393,7 @@ private fun BenchWebView(
                 override fun onPageFinished(view: WebView?, url: String?) {
                     if (url?.let { isTrustedOrigin(Uri.parse(it), trustedOrigin) } == true) {
                         startCameraIfRequested(view)
+                        deliverFileIfReady(view)
                     }
                     if (supportsScanMessages &&
                         !WebViewFeature.isFeatureSupported(WebViewFeature.DOCUMENT_START_SCRIPT) &&
@@ -356,6 +467,9 @@ private fun BenchWebView(
     }
     LaunchedEffect(pendingScanRequest, webView) {
         startCameraIfRequested(webView)
+    }
+    LaunchedEffect(incomingFile?.id, webView) {
+        deliverFileIfReady(webView)
     }
     DisposableEffect(webView, lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
