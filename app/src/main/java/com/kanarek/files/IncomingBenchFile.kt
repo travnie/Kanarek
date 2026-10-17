@@ -132,10 +132,17 @@ object IncomingBenchFiles {
     fun importJavascript(payload: PreparedBenchFile): String {
         val inputId = when (payload.target) {
             BenchFileTarget.CODE -> "fileInput"
-            BenchFileTarget.STREAM -> if (payload.filename.endsWith(".xmltv", true)) "epgFile" else "playlistFile"
+            BenchFileTarget.STREAM -> if (payload.filename.endsWith(".xmltv", true) ||
+                payload.filename.endsWith(".xml", true) ||
+                payload.mime.equals("application/xml", true) ||
+                payload.mime.equals("text/xml", true)
+            ) "epgFile" else "playlistFile"
             BenchFileTarget.DOC -> when {
-                payload.filename.endsWith(".pdf", true) -> "pdf-input"
-                payload.filename.endsWith(".docx", true) -> "docx-to-pdf-input"
+                payload.filename.endsWith(".pdf", true) ||
+                    payload.mime.equals("application/pdf", true) -> "pdf-input"
+                payload.filename.endsWith(".docx", true) ||
+                    payload.mime.equals("application/vnd.openxmlformats-officedocument.wordprocessingml.document", true) ->
+                    "docx-to-pdf-input"
                 else -> "file-input"
             }
         }

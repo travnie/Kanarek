@@ -70,8 +70,10 @@ First pass on `feat/open-with-benches`:
   streams are handled as temporary text documents. No broad storage access.
   Consumed intents are cleared so recreation does not replay imports.
 - Images route to Codebench's existing decode input, text/config files to
-  Docbench's document input, playlists to Streambench's playlist input;
-  playlists can also be opened as raw text in Docbench.
+  Docbench's document input, M3U/M3U8 to Streambench's playlist input;
+  M3U can also open as raw text in Docbench. XML can optionally be treated as
+  XMLTV after selecting Streambench, never silently. PLS/XSPF are currently
+  editable in Docbench; Streambench's parser does not yet support them.
 - The hosted preview loads at most 4 MiB in memory, passes base64-encoded data
   only into the selected first-party HTTPS origin after explicit confirmation,
   then drops the temporary data. No backend upload is performed by Kanarek;
@@ -85,8 +87,9 @@ First pass on `feat/open-with-benches`:
 
 
 
-- Android Storage Access Framework for open/create/save without blanket disk
-  permission. Support `ACTION_SEND` / `ACTION_VIEW` and document URI grants.
+- Complete Android Storage Access Framework open/create/save without blanket
+  disk permission. External `ACTION_VIEW` / `ACTION_SEND` with URI grants is
+  covered by the current preview importer; in-place save/export is not.
 - A versioned, typed and explicitly allowlisted bridge between *bundled*
   Bench pages and Android. No unrestricted `addJavascriptInterface` exposed
   to hosted or third-party pages; verify main frame origin, payload size,

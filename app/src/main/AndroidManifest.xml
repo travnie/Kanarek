@@ -85,7 +85,6 @@
                 <data android:mimeType="audio/x-mpegurl" />
                 <data android:mimeType="audio/mpegurl" />
                 <data android:mimeType="audio/x-scpls" />
-                <data android:scheme="content" />
             </intent-filter>
         </activity>
 
