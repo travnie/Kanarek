@@ -20,7 +20,7 @@ class NewsWidgetStateTest {
             NewsWidgetConfig(
                 feeds = listOf("https://example.com/widget.xml"),
                 headlines = false,
-                intervalSeconds = 7,
+                intervalSeconds = 60,
             )
 
         assertEquals(global, NewsWidgetConfigs.migrate(null, global))
@@ -41,7 +41,7 @@ class NewsWidgetStateTest {
             )
 
         assertEquals(listOf("https://example.com/feed"), normalized.feeds)
-        assertEquals(120, normalized.intervalSeconds)
+        assertEquals(300, normalized.intervalSeconds)
     }
 
     @Test
@@ -74,18 +74,27 @@ class NewsWidgetStateTest {
             )
 
         assertEquals(listOf("https://example.com/fallback"), normalized.feeds)
-        assertEquals(3, normalized.intervalSeconds)
+        assertEquals(15, normalized.intervalSeconds)
     }
 
     @Test
     fun slideshowUsesPrecompiledRemoteViewsLayouts() {
         assertEquals(R.layout.widget_static, newsWidgetLayoutId(SettingsStore.INTERVAL_OFF))
-        assertEquals(R.layout.widget_interval_5s, newsWidgetLayoutId(5))
-        assertEquals(R.layout.widget, newsWidgetLayoutId(7))
-        assertEquals(R.layout.widget_interval_10s, newsWidgetLayoutId(10))
-        assertEquals(R.layout.widget_interval_15s, newsWidgetLayoutId(15))
-        assertEquals(R.layout.widget_interval_30s, newsWidgetLayoutId(30))
-        assertEquals(R.layout.widget, newsWidgetLayoutId(120))
+        assertEquals(R.layout.widget, newsWidgetLayoutId(15))
+        assertEquals(R.layout.widget_interval_60s, newsWidgetLayoutId(60))
+        assertEquals(R.layout.widget_interval_300s, newsWidgetLayoutId(300))
+    }
+
+    @Test
+    fun everyIntervalOptionHasOwnLayoutAndLegacyValuesSnap() {
+        val layouts = SettingsStore.INTERVAL_OPTIONS.map(::newsWidgetLayoutId)
+        assertEquals(layouts.size, layouts.toSet().size)
+        assertEquals(15, SettingsStore.normalizeInterval(5))
+        assertEquals(15, SettingsStore.normalizeInterval(7))
+        assertEquals(15, SettingsStore.normalizeInterval(30))
+        assertEquals(60, SettingsStore.normalizeInterval(45))
+        assertEquals(60, SettingsStore.normalizeInterval(120))
+        assertEquals(SettingsStore.DEFAULT_INTERVAL, SettingsStore.normalizeInterval(SettingsStore.DEFAULT_INTERVAL))
     }
 
     @Test

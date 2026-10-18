@@ -5,6 +5,7 @@ import android.graphics.Color
 import android.widget.FrameLayout
 import android.widget.RemoteViews
 import com.kanarek.R
+import com.kanarek.data.SettingsStore
 import com.kanarek.data.Station
 import com.kanarek.data.StationKind
 import org.junit.Assert.assertNotNull
@@ -43,6 +44,9 @@ class WidgetRemoteViewsTest {
     private fun assertEveryWidgetLayoutInflates() {
         listOf(
             R.layout.widget,
+            R.layout.widget_interval_60s,
+            R.layout.widget_interval_300s,
+            R.layout.widget_static,
             R.layout.widget_item_compact,
             R.layout.widget_item,
             R.layout.widget_item_expanded,
@@ -76,25 +80,27 @@ class WidgetRemoteViewsTest {
     }
 
     @Test
-    fun `news widget builds in every status and size`() {
-        val config =
-            NewsWidgetConfig(
-                feeds = listOf("https://example.com/feed.xml"),
-                headlines = false,
-                intervalSeconds = 7,
-            )
+    fun `news widget builds in every status, size and interval`() {
         val provider = KanarekWidgetProvider()
-        WidgetSizeClass.entries.forEach { sizeClass ->
-            listOf(null, 1_700_000_000_000L).forEach { updatedAt ->
-                assertNotNull(
-                    provider.buildViews(
-                        context = app,
-                        appWidgetId = APP_WIDGET_ID,
-                        config = config,
-                        lastUpdatedMillis = updatedAt,
-                        sizeClass = sizeClass,
-                    ),
+        (SettingsStore.INTERVAL_OPTIONS + SettingsStore.INTERVAL_OFF).forEach { interval ->
+            val config =
+                NewsWidgetConfig(
+                    feeds = listOf("https://example.com/feed.xml"),
+                    headlines = false,
+                    intervalSeconds = interval,
                 )
+            WidgetSizeClass.entries.forEach { sizeClass ->
+                listOf(null, 1_700_000_000_000L).forEach { updatedAt ->
+                    assertNotNull(
+                        provider.buildViews(
+                            context = app,
+                            appWidgetId = APP_WIDGET_ID,
+                            config = config,
+                            lastUpdatedMillis = updatedAt,
+                            sizeClass = sizeClass,
+                        ),
+                    )
+                }
             }
         }
     }

@@ -110,6 +110,7 @@
     <string name="widget_hint">Dodaj widget Kanarka z listy widgetów launchera, potem złap za róg, żeby zmienić rozmiar.</string>
     <string name="widget_interval">Domyślne tempo slajdów widgetu</string>
     <string name="widget_interval_seconds">%1$d s</string>
+    <string name="widget_interval_minutes">%1$d min</string>
     <string name="background_refresh">Odświeżanie wiadomości w tle</string>
     <string name="background_refresh_summary">Utrzymuje aktualny cache Readera również bez widgetu wiadomości. Android może opóźniać dokładny termin, aby oszczędzać baterię.</string>
     <string name="background_refresh_off">Wyłączone</string>
