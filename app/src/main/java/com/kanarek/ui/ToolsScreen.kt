@@ -67,6 +67,7 @@ import androidx.core.content.ContextCompat
 import androidx.webkit.WebViewCompat
 import androidx.webkit.WebViewFeature
 import com.kanarek.files.BenchFileTarget
+import com.kanarek.files.BenchImportException
 import com.kanarek.files.IncomingBenchFile
 import com.kanarek.files.IncomingBenchFiles
 import com.kanarek.files.PreparedBenchFile
@@ -132,6 +133,7 @@ internal fun ToolsScreen(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val importFailureMessage = stringResource(R.string.open_with_failed)
+    val tooLargeMessage = stringResource(R.string.open_with_too_large)
     var openingFile by remember { mutableStateOf(false) }
     var fileError by remember { mutableStateOf<String?>(null) }
     var preparedFile by remember { mutableStateOf<PreparedBenchFile?>(null) }
@@ -250,7 +252,10 @@ internal fun ToolsScreen(
                                         preparedFile = ready
                                         selectedKey = target.name
                                     } catch (error: Exception) {
-                                        fileError = error.localizedMessage ?: importFailureMessage
+                                        fileError =
+                                            if ((error as? BenchImportException)?.reason ==
+                                                BenchImportException.Reason.TOO_LARGE
+                                            ) tooLargeMessage else importFailureMessage
                                         processingFileId = null
                                         onFileHandled(source.id)
                                     } finally {
@@ -258,7 +263,7 @@ internal fun ToolsScreen(
                                     }
                                 }
                             }) {
-                                Text(target.name.lowercase().replaceFirstChar { it.uppercase() } + "bench")
+                                Text(Bench.valueOf(target.name).label)
                             }
                         }
                     }
@@ -373,7 +378,7 @@ private fun BenchWebView(
             settings.mediaPlaybackRequiresUserGesture = true
             CookieManager.getInstance().setAcceptThirdPartyCookies(this, false)
 
-            val scanOrigins = setOf("https://codebench.trfny.com")
+            val scanOrigins = setOf(Bench.CODE.url)
             val supportsScanMessages = bench == Bench.CODE &&
                 WebViewFeature.isFeatureSupported(WebViewFeature.WEB_MESSAGE_LISTENER)
             if (supportsScanMessages) {
