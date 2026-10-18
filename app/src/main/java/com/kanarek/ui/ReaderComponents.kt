@@ -338,17 +338,10 @@ internal fun ReaderSettingsPane(
             stringResource(R.string.widget_interval),
             style = MaterialTheme.typography.labelLarge,
         )
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            listOf(5, 7, 10, 15, 30).forEach { seconds ->
-                FilterChip(
-                    selected = state.intervalSeconds == seconds,
-                    onClick = { actions.onIntervalChange(seconds) },
-                    label = {
-                        Text(stringResource(R.string.widget_interval_seconds, seconds))
-                    },
-                )
-            }
-        }
+        SlideshowIntervalChips(
+            selected = state.intervalSeconds,
+            onSelect = actions.onIntervalChange,
+        )
 
         androidx.compose.foundation.layout.Spacer(Modifier.height(4.dp))
 

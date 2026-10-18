@@ -8,7 +8,6 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -21,7 +20,6 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
@@ -44,6 +42,7 @@ import androidx.compose.ui.unit.dp
 import com.kanarek.R
 import com.kanarek.data.NewsRepository
 import com.kanarek.data.SettingsStore
+import com.kanarek.ui.SlideshowIntervalChips
 import com.kanarek.ui.theme.KanarekTheme
 import java.net.URI
 import kotlinx.coroutines.Dispatchers
@@ -218,26 +217,10 @@ private fun NewsWidgetConfigScreen(
             text = stringResource(R.string.widget_config_interval),
             style = MaterialTheme.typography.titleMedium,
         )
-        Row(
-            modifier = Modifier.horizontalScroll(rememberScrollState()),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            listOf(SettingsStore.INTERVAL_OFF, 5, 7, 10, 15, 30).forEach { seconds ->
-                FilterChip(
-                    selected = intervalSeconds == seconds,
-                    onClick = { intervalSeconds = seconds },
-                    label = {
-                        Text(
-                            if (seconds == SettingsStore.INTERVAL_OFF) {
-                                stringResource(R.string.background_refresh_off)
-                            } else {
-                                stringResource(R.string.widget_interval_seconds, seconds)
-                            },
-                        )
-                    },
-                )
-            }
-        }
+        SlideshowIntervalChips(
+            selected = intervalSeconds,
+            onSelect = { intervalSeconds = it },
+        )
 
         Button(
             onClick = {

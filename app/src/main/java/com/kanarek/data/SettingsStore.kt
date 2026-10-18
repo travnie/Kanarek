@@ -12,6 +12,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.runBlocking
+import kotlin.math.abs
 
 private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "settings")
 
@@ -261,10 +262,15 @@ class SettingsStore(
         private val KEY_LAST_STATION = stringPreferencesKey("last_station_id")
         private val KEY_APP_THEME_MODE = stringPreferencesKey("app_theme_mode")
         const val INTERVAL_OFF = 0
-        const val DEFAULT_INTERVAL = 7
+        const val DEFAULT_INTERVAL = 15
         const val DEFAULT_PER_SOURCE_CAP = 0
 
+        // Each option needs a precompiled widget layout (newsWidgetLayoutId).
+        val INTERVAL_OPTIONS = listOf(15, 60, 300)
+
+        // Legacy values (old 3..120 s range) snap to nearest option; ties -> shorter.
         internal fun normalizeInterval(seconds: Int): Int =
-            if (seconds == INTERVAL_OFF) INTERVAL_OFF else seconds.coerceIn(3, 120)
+            if (seconds == INTERVAL_OFF) INTERVAL_OFF
+            else INTERVAL_OPTIONS.minBy { abs(it - seconds) }
     }
 }

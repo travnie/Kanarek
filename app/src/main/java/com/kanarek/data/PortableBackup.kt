@@ -313,7 +313,7 @@ internal object PortableBackupValidator {
         )
         checkBackup(
             input.settings.intervalSeconds == SettingsStore.INTERVAL_OFF ||
-                input.settings.intervalSeconds in 3..120,
+                input.settings.intervalSeconds in 3..300,
             "Invalid widget interval",
         )
         checkBackup(

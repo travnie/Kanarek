@@ -35,11 +35,8 @@ private data class NewsWidgetRender(
 internal fun newsWidgetLayoutId(intervalSeconds: Int): Int =
     when (intervalSeconds) {
         SettingsStore.INTERVAL_OFF -> R.layout.widget_static
-        5 -> R.layout.widget_interval_5s
-        7 -> R.layout.widget
-        10 -> R.layout.widget_interval_10s
-        15 -> R.layout.widget_interval_15s
-        30 -> R.layout.widget_interval_30s
+        60 -> R.layout.widget_interval_60s
+        300 -> R.layout.widget_interval_300s
         else -> R.layout.widget
     }
 
