@@ -20,7 +20,7 @@ class NewsWidgetStateTest {
             NewsWidgetConfig(
                 feeds = listOf("https://example.com/widget.xml"),
                 headlines = false,
-                intervalSeconds = 7,
+                intervalSeconds = 60,
             )
 
         assertEquals(global, NewsWidgetConfigs.migrate(null, global))
