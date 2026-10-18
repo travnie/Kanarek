@@ -195,5 +195,6 @@
     <string name="open_with_cancel">Cancel</string>
     <string name="open_with_loading">Reading local file…</string>
     <string name="open_with_failed">Could not hand over this file. You can open it manually with the Bench file picker.</string>
+    <string name="open_with_too_large">File is larger than 4 MB. Open it with the Bench file picker.</string>
     <string name="open_with_failed_title">File not imported</string>
 </resources>

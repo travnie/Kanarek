@@ -34,6 +34,11 @@ data class PreparedBenchFile(
     val target: BenchFileTarget,
 )
 
+// UI maps reason to localized text; no English message reaches the user.
+class BenchImportException(val reason: Reason) : IOException(reason.name) {
+    enum class Reason { TOO_LARGE, UNREADABLE }
+}
+
 object IncomingBenchFiles {
     // The hosted WebView handoff is intentionally small. Larger files can be
     // selected through Bench's own system file picker; bundled assets come later.
@@ -101,7 +106,7 @@ object IncomingBenchFiles {
     suspend fun prepare(context: Context, source: IncomingBenchFile, target: BenchFileTarget): PreparedBenchFile =
         withContext(Dispatchers.IO) {
             if (source.size != null && source.size > MAX_PREVIEW_BYTES) {
-                throw IOException("File exceeds the 4 MB preview limit. Open it using the Bench file picker.")
+                throw BenchImportException(BenchImportException.Reason.TOO_LARGE)
             }
             val textBytes = source.inlineText?.toByteArray(Charsets.UTF_8)
             if (textBytes != null) {
@@ -110,16 +115,16 @@ object IncomingBenchFiles {
                 )
             }
             val output = ByteArrayOutputStream()
-            val uri = source.uri ?: throw IOException("Missing document URI.")
+            val uri = source.uri ?: throw BenchImportException(BenchImportException.Reason.UNREADABLE)
             val stream = context.contentResolver.openInputStream(uri)
-                ?: throw IOException("Could not open the selected document.")
+                ?: throw BenchImportException(BenchImportException.Reason.UNREADABLE)
             stream.use { input ->
                 val chunk = ByteArray(32 * 1024)
                 while (true) {
                     val read = input.read(chunk)
                     if (read < 0) break
                     if (output.size() + read > MAX_PREVIEW_BYTES) {
-                        throw IOException("File exceeds the 4 MB preview limit. Open it using the Bench file picker.")
+                        throw BenchImportException(BenchImportException.Reason.TOO_LARGE)
                     }
                     output.write(chunk, 0, read)
                 }

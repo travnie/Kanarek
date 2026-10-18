@@ -193,5 +193,6 @@
     <string name="open_with_cancel">Anuluj</string>
     <string name="open_with_loading">Odczytywanie pliku…</string>
     <string name="open_with_failed">Nie udało się przekazać pliku. Można go otworzyć ręcznie przez systemowy wybór plików w Bench.</string>
+    <string name="open_with_too_large">Plik ma ponad 4 MB. Otwórz go przez wybór plików w Bench.</string>
     <string name="open_with_failed_title">Nie zaimportowano pliku</string>
 </resources>

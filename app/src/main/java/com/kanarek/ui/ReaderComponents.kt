@@ -12,13 +12,11 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Bookmark
@@ -45,7 +43,6 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.SwipeToDismissBox
 import androidx.compose.material3.SwipeToDismissBoxValue
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -250,157 +247,6 @@ internal fun ReaderListPane(
                 }
             }
         }
-    }
-}
-
-@Composable
-internal fun ReaderSettingsPane(
-    state: ReaderSettingsUiState,
-    actions: ReaderSettingsActions,
-    modifier: Modifier = Modifier,
-) {
-    Column(
-        modifier =
-            modifier
-                // The pane hosts text fields and the window is edge-to-edge, so the IME would
-                // otherwise cover whichever field has focus. imePadding() goes outside the
-                // scroll modifier: it must resize the viewport, not scroll away with content.
-                .imePadding()
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = 16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        Text(
-            stringResource(R.string.feeds_label),
-            style = MaterialTheme.typography.labelLarge,
-        )
-        OutlinedTextField(
-            value = state.feedText,
-            onValueChange = actions.onFeedTextChange,
-            modifier = Modifier.fillMaxWidth(),
-            minLines = 3,
-            maxLines = 6,
-        )
-
-        Text(
-            stringResource(R.string.backend_label),
-            style = MaterialTheme.typography.labelLarge,
-        )
-        OutlinedTextField(
-            value = state.backendText,
-            onValueChange = actions.onBackendTextChange,
-            modifier = Modifier.fillMaxWidth(),
-            singleLine = true,
-            placeholder = { Text(stringResource(R.string.backend_hint)) },
-        )
-
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Button(onClick = actions.onSave) {
-                Text(stringResource(R.string.save_update_widget))
-            }
-        }
-
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            OutlinedButton(onClick = actions.onImportOpml) {
-                Text(stringResource(R.string.import_opml))
-            }
-            OutlinedButton(onClick = actions.onExportOpml) {
-                Text(stringResource(R.string.export_opml))
-            }
-        }
-
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            OutlinedButton(onClick = actions.onAddSite) {
-                Text(stringResource(R.string.add_site))
-            }
-        }
-
-        OutlinedButton(
-            onClick = actions.onOpenStorage,
-            modifier = Modifier.fillMaxWidth(),
-        ) {
-            Text(stringResource(R.string.storage_and_data))
-        }
-
-        OutlinedButton(
-            onClick = actions.onOpenNotifications,
-            modifier = Modifier.fillMaxWidth(),
-        ) {
-            Text(stringResource(R.string.news_notifications))
-        }
-
-        Text(
-            stringResource(R.string.widget_hint),
-            style = MaterialTheme.typography.bodySmall,
-        )
-
-        Text(
-            stringResource(R.string.widget_interval),
-            style = MaterialTheme.typography.labelLarge,
-        )
-        SlideshowIntervalChips(
-            selected = state.intervalSeconds,
-            onSelect = actions.onIntervalChange,
-        )
-
-        androidx.compose.foundation.layout.Spacer(Modifier.height(4.dp))
-
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            Switch(
-                checked = state.headlinesMode,
-                onCheckedChange = actions.onHeadlinesChange,
-            )
-            Text(
-                stringResource(R.string.headlines_only),
-                style = MaterialTheme.typography.bodyMedium,
-            )
-        }
-
-        Text(
-            stringResource(R.string.per_source_cap),
-            style = MaterialTheme.typography.labelLarge,
-        )
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            listOf(0, 2, 3, 5).forEach { value ->
-                FilterChip(
-                    selected = state.perSourceCap == value,
-                    onClick = { actions.onPerSourceCapChange(value) },
-                    label = {
-                        Text(
-                            if (value == 0) {
-                                stringResource(R.string.cap_off)
-                            } else {
-                                value.toString()
-                            },
-                        )
-                    },
-                )
-            }
-        }
-
-        if (state.previewSources.isNotEmpty()) {
-            Text(
-                stringResource(R.string.top_sources),
-                style = MaterialTheme.typography.labelLarge,
-            )
-            Row(
-                modifier = Modifier.horizontalScroll(rememberScrollState()),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                state.previewSources.forEach { source ->
-                    FilterChip(
-                        selected = state.topSources.any { it.equals(source, ignoreCase = true) },
-                        onClick = { actions.onToggleTopSource(source) },
-                        label = { Text(source) },
-                    )
-                }
-            }
-        }
-
-        androidx.compose.foundation.layout.Spacer(Modifier.height(8.dp))
     }
 }
 
