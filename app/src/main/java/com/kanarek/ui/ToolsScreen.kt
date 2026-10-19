@@ -371,7 +371,9 @@ private fun BenchWebView(
         else isTrustedOrigin(target, trustedOrigin)
     var fileCallback by remember { mutableStateOf<ValueCallback<Array<Uri>>?>(null) }
     var cameraRequest by remember { mutableStateOf<PermissionRequest?>(null) }
-    var pendingExport by remember(bench) { mutableStateOf<BenchExport?>(null) }
+    // A saveable token survives Activity recreation; the bytes stay in private cache.
+    var pendingExportToken by rememberSaveable(bench) { mutableStateOf<String?>(null) }
+    var stagingExport by remember(bench) { mutableStateOf(false) }
     var exportFailed by remember(bench) { mutableStateOf(false) }
     val receiver = remember(bench) { BenchExportReceiver() }
     var startedScanRequest by remember(bench) { mutableIntStateOf(0) }
@@ -408,20 +410,30 @@ private fun BenchWebView(
     }
 
     val exportPicker = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
-        val payload = pendingExport
-        pendingExport = null
+        val token = pendingExportToken
+        pendingExportToken = null
         val uri = result.data?.data
-        if (result.resultCode == Activity.RESULT_OK && uri != null && payload != null) {
-            scope.launch {
-                val saved = withContext(Dispatchers.IO) {
-                    runCatching {
-                        context.contentResolver.openOutputStream(uri, "w")?.use {
-                            it.write(payload.bytes)
-                        } ?: error("Document provider refused export")
-                    }.isSuccess
+        if (result.resultCode == Activity.RESULT_OK) {
+            if (uri == null || token == null) {
+                // The document picker may have created an empty file already.
+                exportFailed = true
+            } else {
+                scope.launch {
+                    val saved = withContext(Dispatchers.IO) {
+                        try {
+                            BenchExportStore.writeTo(context, token, uri)
+                            true
+                        } catch (_: Exception) {
+                            false
+                        } finally {
+                            BenchExportStore.discard(context, token)
+                        }
+                    }
+                    if (!saved) exportFailed = true
                 }
-                if (!saved) exportFailed = true
             }
+        } else if (token != null) {
+            scope.launch(Dispatchers.IO) { BenchExportStore.discard(context, token) }
         }
     }
     val filePicker = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
@@ -467,18 +479,30 @@ private fun BenchWebView(
                                 } else {
                                     val payload = receiver.accept(data)
                                     if (payload != null) {
-                                        if (pendingExport != null) {
+                                        if (pendingExportToken != null || stagingExport) {
                                             exportFailed = true
                                         } else {
-                                            pendingExport = payload
-                                            val saveIntent = Intent(Intent.ACTION_CREATE_DOCUMENT).apply {
-                                                addCategory(Intent.CATEGORY_OPENABLE)
-                                                type = payload.mime
-                                                putExtra(Intent.EXTRA_TITLE, payload.name)
-                                            }
-                                            runCatching { exportPicker.launch(saveIntent) }.onFailure {
-                                                pendingExport = null
-                                                exportFailed = true
+                                            stagingExport = true
+                                            scope.launch {
+                                                var token: String? = null
+                                                try {
+                                                    token = withContext(Dispatchers.IO) {
+                                                        BenchExportStore.stage(context, payload)
+                                                    }
+                                                    pendingExportToken = token
+                                                    val saveIntent = Intent(Intent.ACTION_CREATE_DOCUMENT).apply {
+                                                        addCategory(Intent.CATEGORY_OPENABLE)
+                                                        type = payload.mime
+                                                        putExtra(Intent.EXTRA_TITLE, payload.name)
+                                                    }
+                                                    exportPicker.launch(saveIntent)
+                                                } catch (_: Exception) {
+                                                    token?.let { BenchExportStore.discard(context, it) }
+                                                    pendingExportToken = null
+                                                    exportFailed = true
+                                                } finally {
+                                                    stagingExport = false
+                                                }
                                             }
                                         }
                                     }
@@ -640,7 +664,8 @@ private fun BenchWebView(
             cameraRequest?.deny()
             cameraRequest = null
             receiver.reset()
-            pendingExport = null
+            // No cache cleanup here: rotation also disposes the WebView while
+            // the Android save picker is open.
         }
     }
     if (exportFailed) {
