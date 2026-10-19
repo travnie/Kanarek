@@ -86,6 +86,9 @@
     <string name="tools_docbench_description">Documents, PDFs and text files</string>
     <string name="tools_streambench_description">Stream diagnostics and playlist workshop</string>
     <string name="tools_online_hint">Hosted preview · online only · save before leaving</string>
+    <string name="tools_offline_intro">Codebench runs offline from this APK. Docbench and Streambench still use hosted previews; native exports are coming next.</string>
+    <string name="tools_hybrid_hint">Codebench offline · Docbench / Streambench online · save before leaving</string>
+    <string name="tools_offline_badge">Offline</string>
     <string name="tools_open">Open</string>
     <string name="tools_back">Back to tools</string>
     <string name="settings">Settings</string>
@@ -192,6 +195,7 @@
     <string name="video_fullscreen_exit">Exit fullscreen</string>
     <string name="open_with_title">Open file with Kanarek</string>
     <string name="open_with_privacy">Choose a Bench. Its hosted scripts will read the selected file in the WebView after your confirmation. Kanarek does not upload it. Hosted import is limited to 4 MB.</string>
+    <string name="open_with_offline_privacy">Choose a Bench. Bundled Codebench reads the file on-device; hosted Benches use their web scripts. Kanarek itself does not upload the file. Import limit: 4 MB.</string>
     <string name="open_with_cancel">Cancel</string>
     <string name="open_with_loading">Reading local file…</string>
     <string name="open_with_failed">Could not hand over this file. You can open it manually with the Bench file picker.</string>

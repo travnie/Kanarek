@@ -31,6 +31,25 @@ replace Streambench's allowlisted relay with an unrestricted proxy.
 
 ## Delivery slices
 
+**Codebench offline (GitHub APK slice):** `stage-codebench.sh` builds the upstream
+single-file Codebench at a pinned twojstar commit during Android CI and rolling
+release builds. Both Play/FOSS APKs include the HTML, WASM, JS, and fonts via
+one asset. `WebViewAssetLoader` serves it from an HTTPS app origin; unrelated
+network requests are denied. An unstaged local/F-Droid build still uses the
+hosted Codebench and never claims offline support. File imports and camera
+scanning reuse the existing guarded WebView interface. Native save/export,
+Docbench and Streambench bundling, and physical device verification remain open.
+
+To stage locally, install Node 24, git and npm, then run:
+
+```sh
+bash .github/scripts/stage-codebench.sh
+```
+
+Assets under `app/src/main/assets/benches/` are generated and ignored. The
+pin and build logic live in the script; Bench sources stay maintained only in
+twojstar. A staged APK remains offline without contacting GitHub at runtime.
+
 ### 1. Native Tools hub (initial PR)
 
 - Add a third Compose destination reachable via the existing pager, bottom bar
@@ -49,6 +68,9 @@ replace Streambench's allowlisted relay with an unrestricted proxy.
   scanner permissions and offline reader/player regression checks.
 
 ### 2. Bundled portable web assets
+
+- Codebench portable asset: staged in the GitHub APK pipelines; runtime selects it only when present.
+- Docbench and Streambench still hosted; offline packaging is pending.
 
 - Reuse each Bench's existing `public/portable.html` build; maintain one
   source of truth in twojstar. Pin a source revision/artifact manifest in

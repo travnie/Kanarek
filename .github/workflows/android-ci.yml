@@ -73,7 +73,7 @@ jobs:
       - name: Verify Codebench is inside both APK flavors
         run: |
           for apk in app/build/outputs/apk/{play,foss}/debug/*.apk; do
-            unzip -l "$apk" | grep -q 'assets/benches/codebench/portable.html' || exit 1
+            unzip -Z1 "$apk" | grep -Fx 'assets/benches/codebench/portable.html' || exit 1
           done
 
       - name: Upload debug APK
