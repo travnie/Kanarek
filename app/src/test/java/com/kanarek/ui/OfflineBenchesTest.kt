@@ -24,7 +24,7 @@ class OfflineBenchesTest {
         for (kind in BenchKind.entries) {
             assertTrue(OfflineBenches.isTrustedPage(Uri.parse(OfflineBenches.url(kind)), kind))
             assertTrue(OfflineBenches.isTrustedPage(Uri.parse(OfflineBenches.url(kind) + "#editor"), kind))
-            assertFalse(OfflineBenches.isTrustedPage(Uri.parse(OfflineBenches.url(kind)), BenchKind.DOC))
+            assertFalse(OfflineBenches.isTrustedPage(Uri.parse(OfflineBenches.url(kind)), if (kind == BenchKind.DOC) BenchKind.CODE else BenchKind.DOC))
             assertFalse(OfflineBenches.isTrustedPage(Uri.parse(OfflineBenches.url(kind) + "?q=1"), kind))
             assertFalse(OfflineBenches.isTrustedPage(Uri.parse("http://appassets.androidplatform.net/benches/${kind.slug}/portable.html"), kind))
         }
@@ -49,10 +49,10 @@ class OfflineBenchesTest {
             val served = loader.shouldInterceptRequest(Uri.parse(OfflineBenches.url(kind)))
             assertEquals(OfflineBenches.isBundled(context, kind), served != null)
             served?.data?.close()
-            assertEquals("https://example.com", OfflineBenches.destination(false, name, "https://example.com"))
-            assertEquals(OfflineBenches.url(kind), OfflineBenches.destination(true, name, "https://example.com"))
+            assertEquals("https://example.com", OfflineBenches.destination(false, kind, "https://example.com"))
+            assertEquals(OfflineBenches.url(kind), OfflineBenches.destination(true, kind, "https://example.com"))
             assertEquals(403, OfflineBenches.intercept(
-                loader, Uri.parse("https://blocked.test/tracker"), name,
+                loader, Uri.parse("https://blocked.test/tracker"), kind,
             )?.statusCode)
         }
     }
