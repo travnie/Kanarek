@@ -11,6 +11,7 @@ on: # yamllint disable-line rule:truthy
       - "gradle.properties"
       - "gradle/**"
       - ".github/scripts/gradle-version.sh"
+      - ".github/scripts/stage-codebench.sh"
       - ".github/workflows/release.yml"
   workflow_dispatch:
 
