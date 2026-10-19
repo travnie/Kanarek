@@ -91,6 +91,8 @@
     <string name="tools_streambench_description">Diagnostyka strumieni i edytor playlist</string>
     <string name="tools_online_hint">Podgląd online · zapisz pracę przed wyjściem</string>
     <string name="tools_offline_badge">Offline</string>
+    <string name="tools_switch_online">Online</string>
+    <string name="tools_switch_offline">Offline</string>
     <string name="open_with_offline_privacy">Wybierz warsztat. Wbudowane narzędzia przetwarzają plik na urządzeniu, a pozostałe korzystają z wersji online. Funkcje internetowe Streambencha łączą się z jego backendem. Limit importu: 4 MB.</string>
     <string name="tools_open">Otwórz</string>
     <string name="tools_back">Wróć do narzędzi</string>

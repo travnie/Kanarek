@@ -92,6 +92,8 @@
     <string name="tools_export_failed_title">Export failed</string>
     <string name="tools_export_failed">Could not export this file. The native export limit is 32 MB. Please try a smaller file or another location.</string>
     <string name="tools_offline_badge">Offline</string>
+    <string name="tools_switch_online">Online</string>
+    <string name="tools_switch_offline">Offline</string>
     <string name="tools_open">Open</string>
     <string name="tools_back">Back to tools</string>
     <string name="settings">Settings</string>

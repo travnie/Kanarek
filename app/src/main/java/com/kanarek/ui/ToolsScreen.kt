@@ -146,13 +146,17 @@ internal fun ToolsScreen(
     var preparedFile by remember { mutableStateOf<PreparedBenchFile?>(null) }
     var processingFileId by remember { mutableStateOf<Long?>(null) }
     var selectedKey by rememberSaveable { mutableStateOf<String?>(null) }
+    var useHosted by rememberSaveable { mutableStateOf(false) }
     val selected = Bench.entries.firstOrNull { it.name == selectedKey }
     var scanned by remember { mutableStateOf<ScanPayload?>(null) }
     LaunchedEffect(pendingScanRequest, inboundFile?.id, processingFileId) {
         // A file import in progress owns the page until it is delivered.
         if (pendingScanRequest > 0 && inboundFile == null &&
             processingFileId == null && preparedFile == null
-        ) selectedKey = Bench.CODE.name
+        ) {
+            selectedKey = Bench.CODE.name
+            useHosted = false
+        }
     }
 
     Scaffold(
@@ -167,6 +171,19 @@ internal fun ToolsScreen(
                                 if (selected == null) R.string.menu else R.string.tools_back,
                             ),
                         )
+                    }
+                },
+                actions = {
+                    if (selected != null && bundledBenches[selected] == true) {
+                        TextButton(
+                            enabled = !openingFile && preparedFile == null,
+                            onClick = { useHosted = !useHosted },
+                        ) {
+                            Text(stringResource(
+                                if (useHosted) R.string.tools_switch_offline
+                                else R.string.tools_switch_online,
+                            ))
+                        }
                     }
                 },
             )
@@ -195,6 +212,7 @@ internal fun ToolsScreen(
                     ElevatedCard(
                         onClick = {
                             preparedFile = null
+                            useHosted = false
                             selectedKey = bench.name
                         },
                         modifier = Modifier.fillMaxWidth(),
@@ -216,6 +234,7 @@ internal fun ToolsScreen(
         } else if (isActive) {
             BenchWebView(
                 bench = selected,
+                useHosted = useHosted,
                 pendingScanRequest = pendingScanRequest,
                 onScanRequestConsumed = onScanRequestConsumed,
                 modifier = Modifier.fillMaxSize().padding(padding),
@@ -224,6 +243,7 @@ internal fun ToolsScreen(
                     preparedFile = null
                     processingFileId = null
                     selectedKey = null
+                    useHosted = false
                 },
                 onScan = { scanned = it },
                 incomingFile = preparedFile?.takeIf { it.target.name == benchKey(selected) },
@@ -323,6 +343,7 @@ private fun benchKey(bench: Bench): String = bench.name
 @Composable
 private fun BenchWebView(
     bench: Bench,
+    useHosted: Boolean,
     pendingScanRequest: Int,
     onScanRequestConsumed: (Int) -> Unit,
     modifier: Modifier = Modifier,
@@ -335,7 +356,9 @@ private fun BenchWebView(
     val lifecycleOwner = LocalLifecycleOwner.current
     val scope = rememberCoroutineScope()
     val benchKind = remember(bench) { bench.name.lowercase() }
-    val offline = remember(bench, context) { OfflineBenches.isBundled(context, benchKind) }
+    val offline = remember(bench, context, useHosted) {
+        !useHosted && OfflineBenches.isBundled(context, benchKind)
+    }
     val pageUrl = OfflineBenches.destination(offline, benchKind, bench.url)
     val trustedOrigin = remember(pageUrl) { Uri.parse(pageUrl) }
     val assetLoader = remember(offline, context) {
@@ -412,7 +435,7 @@ private fun BenchWebView(
         cameraRequest = null
     }
 
-    val webView = remember(bench) {
+    val webView = remember(bench, useHosted) {
         WebView(context).apply {
             settings.javaScriptEnabled = true
             settings.domStorageEnabled = true
