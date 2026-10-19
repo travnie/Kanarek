@@ -11,7 +11,7 @@ on: # yamllint disable-line rule:truthy
       - "gradle.properties"
       - "gradle/**"
       - ".github/scripts/gradle-version.sh"
-      - ".github/scripts/stage-codebench.sh"
+      - ".github/scripts/stage-benches.sh"
       - ".github/workflows/release.yml"
   workflow_dispatch:
 
@@ -57,13 +57,13 @@ jobs:
           distribution: temurin
           java-version: "17"
 
-      - name: Set up Node.js for bundled Codebench
+      - name: Set up Node.js for bundled Benches
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
         with:
           node-version: "24"
 
-      - name: Stage offline Codebench from pinned source
-        run: bash .github/scripts/stage-codebench.sh
+      - name: Stage offline Benches from pinned source
+        run: bash .github/scripts/stage-benches.sh
 
       - name: Read the Gradle version from the wrapper properties
         id: gradle
