@@ -28,6 +28,14 @@ jobs:
           distribution: temurin
           java-version: "17"
 
+      - name: Set up Node.js for bundled Codebench
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
+        with:
+          node-version: "24"
+
+      - name: Stage offline Codebench from pinned source
+        run: bash .github/scripts/stage-codebench.sh
+
       - name: Read the Gradle version from the wrapper properties
         id: gradle
         run: .github/scripts/gradle-version.sh
@@ -61,6 +69,12 @@ jobs:
         run: |
           ./gradlew assemblePlayDebug assembleFossDebug testPlayDebugUnitTest \
             :shared:testAndroidHostTest lintPlayDebug -Proborazzi.test.record=true --stacktrace
+
+      - name: Verify Codebench is inside both APK flavors
+        run: |
+          for apk in app/build/outputs/apk/{play,foss}/debug/*.apk; do
+            unzip -l "$apk" | grep -q 'assets/benches/codebench/portable.html' || exit 1
+          done
 
       - name: Upload debug APK
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
