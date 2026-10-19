@@ -90,6 +90,7 @@
     <string name="tools_docbench_description">Dokumenty, pliki PDF i pliki tekstowe</string>
     <string name="tools_streambench_description">Diagnostyka strumieni i edytor playlist</string>
     <string name="tools_online_hint">Podgląd online · zapisz pracę przed wyjściem</string>
+    <string name="tools_hybrid_hint">Codebench offline · Docbench i Streambench online · zapisz wyniki przed wyjściem</string>
     <string name="tools_offline_badge">Offline</string>
     <string name="tools_switch_online">Online</string>
     <string name="tools_switch_offline">Offline</string>
