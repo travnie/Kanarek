@@ -339,7 +339,7 @@ private fun BenchWebView(
     val pageUrl = OfflineBenches.destination(offline, benchKind, bench.url)
     val trustedOrigin = remember(pageUrl) { Uri.parse(pageUrl) }
     val assetLoader = remember(offline, context) {
-        if (offline) OfflineBenches.loader(context) else null
+        if (offline) OfflineBenches.loader(context, benchKind) else null
     }
     fun trustedPage(target: Uri): Boolean =
         if (offline) OfflineBenches.isTrustedPage(target, benchKind)
@@ -423,9 +423,9 @@ private fun BenchWebView(
             settings.mediaPlaybackRequiresUserGesture = true
             CookieManager.getInstance().setAcceptThirdPartyCookies(this, false)
 
-            val scanOrigins = setOf(if (offline) OfflineBenches.ORIGIN else Bench.CODE.url)
+            val scanOrigins = setOf(if (offline) OfflineBenches.origin(benchKind) else Bench.CODE.url)
             if (offline && WebViewFeature.isFeatureSupported(WebViewFeature.WEB_MESSAGE_LISTENER)) {
-                val originRules = setOf(OfflineBenches.ORIGIN)
+                val originRules = setOf(OfflineBenches.origin(benchKind))
                 WebViewCompat.addWebMessageListener(
                     this, "KanarekExport", originRules,
                 ) { view, message, origin, isMainFrame, _ ->

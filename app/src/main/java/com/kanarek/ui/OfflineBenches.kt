@@ -8,11 +8,11 @@ import java.io.ByteArrayInputStream
 
 // Same pinned twojstar source, isolated per-Bench pages.
 internal object OfflineBenches {
-    const val ORIGIN = "https://appassets.androidplatform.net"
     private val kinds = setOf("codebench", "docbench", "streambench")
     private const val BACKEND = "streambench.travny.workers.dev"
 
-    fun url(kind: String) = "$ORIGIN/benches/$kind/portable.html"
+    fun origin(kind: String) = "https://$kind.appassets.androidplatform.net"
+    fun url(kind: String) = origin(kind) + "/bench/portable.html"
 
     fun isBundled(context: Context, kind: String): Boolean =
         kind in kinds && runCatching {
@@ -24,30 +24,28 @@ internal object OfflineBenches {
 
     fun isTrustedPage(uri: Uri, kind: String) =
         kind in kinds && uri.scheme == "https" &&
-            uri.host == "appassets.androidplatform.net" &&
-            uri.port == -1 && uri.path == "/benches/$kind/portable.html" &&
+            uri.host == "$kind.appassets.androidplatform.net" &&
+            uri.port == -1 && uri.path == "/bench/portable.html" &&
             uri.query == null
 
     fun isAllowedStreamBackend(uri: Uri): Boolean =
         uri.scheme == "https" && uri.host == BACKEND && uri.port == -1 &&
             (uri.path == "/api" || uri.path?.startsWith("/api/") == true)
 
-    fun loader(context: Context): WebViewAssetLoader =
-        WebViewAssetLoader.Builder().addPathHandler(
-            "/benches/",
-            WebViewAssetLoader.PathHandler { path ->
-                val parts = path.split('/')
-                if (parts.size != 2 || parts[0] !in kinds || parts[1] != "portable.html") {
-                    return@PathHandler null
-                }
+    fun loader(context: Context, kind: String): WebViewAssetLoader {
+        require(kind in kinds)
+        return WebViewAssetLoader.Builder()
+            .setDomain("$kind.appassets.androidplatform.net")
+            .addPathHandler("/bench/", WebViewAssetLoader.PathHandler { path ->
+                if (path != "portable.html") return@PathHandler null
                 runCatching {
                     WebResourceResponse(
                         "text/html", "UTF-8",
-                        context.assets.open("benches/" + parts[0] + "/portable.html"),
+                        context.assets.open("benches/$kind/portable.html"),
                     )
                 }.getOrNull()
-            },
-        ).build()
+            }).build()
+    }
 
     fun intercept(loader: WebViewAssetLoader, uri: Uri, kind: String): WebResourceResponse? {
         if (uri.scheme in setOf("data", "blob", "content")) return null

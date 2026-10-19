@@ -23,6 +23,11 @@ class OfflineBenchesTest {
         }
     }
 
+    @Test fun eachBenchHasSeparateStorageOrigin() {
+        assertFalse(OfflineBenches.origin("codebench") == OfflineBenches.origin("docbench"))
+        assertFalse(OfflineBenches.origin("docbench") == OfflineBenches.origin("streambench"))
+    }
+
     @Test fun onlyExistingRestrictedBackendIsAllowed() {
         assertTrue(OfflineBenches.isAllowedStreamBackend(Uri.parse("https://streambench.travny.workers.dev/api/catalog")))
         assertFalse(OfflineBenches.isAllowedStreamBackend(Uri.parse("https://streambench.travny.workers.dev/secret")))
@@ -32,8 +37,8 @@ class OfflineBenchesTest {
 
     @Test fun bundledPageOrHostedFallback() {
         val context = RuntimeEnvironment.getApplication()
-        val loader = OfflineBenches.loader(context)
         for (name in listOf("codebench", "docbench", "streambench")) {
+            val loader = OfflineBenches.loader(context, name)
             val served = loader.shouldInterceptRequest(Uri.parse(OfflineBenches.url(name)))
             assertEquals(OfflineBenches.isBundled(context, name), served != null)
             served?.data?.close()
