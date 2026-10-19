@@ -197,7 +197,10 @@ internal fun ToolsScreen(
             ) {
                 item {
                     Text(
-                        stringResource(if (bundledBenches.values.all { it }) R.string.tools_offline_intro else R.string.tools_intro),
+                        stringResource(
+                            if (bundledBenches.values.all { it }) R.string.tools_offline_intro
+                            else R.string.tools_intro,
+                        ),
                         modifier = Modifier.padding(vertical = 12.dp),
                     )
                 }

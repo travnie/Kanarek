@@ -28,9 +28,15 @@ class OfflineBenchesTest {
         for (kind in BenchKind.entries) {
             assertTrue(OfflineBenches.isTrustedPage(Uri.parse(OfflineBenches.url(kind)), kind))
             assertTrue(OfflineBenches.isTrustedPage(Uri.parse(OfflineBenches.url(kind) + "#editor"), kind))
-            assertFalse(OfflineBenches.isTrustedPage(Uri.parse(OfflineBenches.url(kind)), if (kind == BenchKind.DOC) BenchKind.CODE else BenchKind.DOC))
+            assertFalse(OfflineBenches.isTrustedPage(
+                Uri.parse(OfflineBenches.url(kind)),
+                if (kind == BenchKind.DOC) BenchKind.CODE else BenchKind.DOC,
+            ))
             assertFalse(OfflineBenches.isTrustedPage(Uri.parse(OfflineBenches.url(kind) + "?q=1"), kind))
-            assertFalse(OfflineBenches.isTrustedPage(Uri.parse("http://appassets.androidplatform.net/benches/${kind.slug}/portable.html"), kind))
+            assertFalse(OfflineBenches.isTrustedPage(
+                Uri.parse("http://appassets.androidplatform.net/benches/${kind.slug}/portable.html"),
+                kind,
+            ))
         }
     }
 
