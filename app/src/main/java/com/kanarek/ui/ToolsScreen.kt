@@ -113,7 +113,7 @@ private fun isTrustedOrigin(target: Uri, trusted: Uri): Boolean =
         (if (target.port == -1) 443 else target.port) ==
         (if (trusted.port == -1) 443 else trusted.port)
 
-private enum class Bench(
+internal enum class Bench(
     val label: String,
     val summaryRes: Int,
     val url: String,

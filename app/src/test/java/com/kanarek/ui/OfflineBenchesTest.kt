@@ -14,6 +14,10 @@ import org.robolectric.annotation.Config
 @Config(sdk = [33])
 class OfflineBenchesTest {
     @Test fun benchAssetMappingIsExplicit() {
+        assertEquals(BenchKind.CODE, Bench.CODE.kind)
+        assertEquals(BenchKind.DOC, Bench.DOC.kind)
+        assertEquals(BenchKind.STREAM, Bench.STREAM.kind)
+        assertEquals(BenchKind.entries.toSet(), Bench.entries.map { it.kind }.toSet())
         assertEquals("codebench", BenchKind.CODE.slug)
         assertEquals("docbench", BenchKind.DOC.slug)
         assertEquals("streambench", BenchKind.STREAM.slug)
