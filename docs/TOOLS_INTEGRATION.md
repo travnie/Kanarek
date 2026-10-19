@@ -69,8 +69,7 @@ twojstar. A staged APK remains offline without contacting GitHub at runtime.
 
 ### 2. Bundled portable web assets
 
-- Codebench portable asset: staged in the GitHub APK pipelines; runtime selects it only when present.
-- Docbench and Streambench still hosted; offline packaging is pending.
+- All three portable assets are staged in the GitHub APK pipelines, selected per Bench only when present.
 
 - Reuse each Bench's existing `public/portable.html` build; maintain one
   source of truth in twojstar. Pin a source revision/artifact manifest in

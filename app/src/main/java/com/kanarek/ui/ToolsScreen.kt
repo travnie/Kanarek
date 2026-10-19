@@ -1,5 +1,6 @@
 package com.kanarek.ui
 
+import android.app.Activity
 import android.Manifest
 import android.graphics.Bitmap
 import android.content.Intent
@@ -76,6 +77,8 @@ import com.kanarek.data.ScanPayload
 import com.kanarek.data.ScanPayloadParser
 import com.kanarek.R
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 // One native hub. Bench code remains owned by travnie/twojstar.
 // Observe Codebench's visible scan history, not third-party pages or page data.
@@ -132,7 +135,9 @@ internal fun ToolsScreen(
     onFileHandled: (Long) -> Unit,
 ) {
     val context = LocalContext.current
-    val bundledCodebench = remember(context) { OfflineCodebench.isBundled(context) }
+    val bundledBenches = remember(context) {
+        Bench.entries.associateWith { OfflineBenches.isBundled(context, it.name.lowercase()) }
+    }
     val scope = rememberCoroutineScope()
     val importFailureMessage = stringResource(R.string.open_with_failed)
     val tooLargeMessage = stringResource(R.string.open_with_too_large)
@@ -174,13 +179,13 @@ internal fun ToolsScreen(
             ) {
                 item {
                     Text(
-                        stringResource(if (bundledCodebench) R.string.tools_offline_intro else R.string.tools_intro),
+                        stringResource(if (bundledBenches.values.all { it }) R.string.tools_offline_intro else R.string.tools_intro),
                         modifier = Modifier.padding(vertical = 12.dp),
                     )
                 }
                 item {
                     Text(
-                        stringResource(if (bundledCodebench) R.string.tools_hybrid_hint else R.string.tools_online_hint),
+                        stringResource(if (bundledBenches.values.all { it }) R.string.tools_all_offline_hint else R.string.tools_online_hint),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(bottom = 4.dp),
@@ -200,7 +205,7 @@ internal fun ToolsScreen(
                             supportingContent = { Text(stringResource(bench.summaryRes)) },
                             trailingContent = {
                                 Text(stringResource(
-                                    if (bench == Bench.CODE && bundledCodebench) R.string.tools_offline_badge
+                                    if (bundledBenches[bench] == true) R.string.tools_offline_badge
                                     else R.string.tools_open,
                                 ))
                             },
@@ -249,7 +254,7 @@ internal fun ToolsScreen(
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         Text(source.filename)
                         Text(stringResource(
-                            if (bundledCodebench) R.string.open_with_offline_privacy
+                            if (bundledBenches.values.any { it }) R.string.open_with_offline_privacy
                             else R.string.open_with_privacy,
                         ))
                         options.forEach { target ->
@@ -328,19 +333,22 @@ private fun BenchWebView(
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
-    val offline = remember(bench, context) {
-        bench == Bench.CODE && OfflineCodebench.isBundled(context)
-    }
-    val pageUrl = OfflineCodebench.destination(offline, bench.url)
+    val scope = rememberCoroutineScope()
+    val benchKind = remember(bench) { bench.name.lowercase() }
+    val offline = remember(bench, context) { OfflineBenches.isBundled(context, benchKind) }
+    val pageUrl = OfflineBenches.destination(offline, benchKind, bench.url)
     val trustedOrigin = remember(pageUrl) { Uri.parse(pageUrl) }
     val assetLoader = remember(offline, context) {
-        if (offline) OfflineCodebench.loader(context) else null
+        if (offline) OfflineBenches.loader(context) else null
     }
     fun trustedPage(target: Uri): Boolean =
-        if (offline) OfflineCodebench.isTrustedPage(target)
+        if (offline) OfflineBenches.isTrustedPage(target, benchKind)
         else isTrustedOrigin(target, trustedOrigin)
     var fileCallback by remember { mutableStateOf<ValueCallback<Array<Uri>>?>(null) }
     var cameraRequest by remember { mutableStateOf<PermissionRequest?>(null) }
+    var pendingExport by remember(bench) { mutableStateOf<BenchExport?>(null) }
+    var exportFailed by remember(bench) { mutableStateOf(false) }
+    val receiver = remember(bench) { BenchExportReceiver() }
     var startedScanRequest by remember(bench) { mutableIntStateOf(0) }
     val currentScanRequest by rememberUpdatedState(pendingScanRequest)
     val currentConsume by rememberUpdatedState(onScanRequestConsumed)
@@ -374,6 +382,23 @@ private fun BenchWebView(
         )
     }
 
+    val exportPicker = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+        val payload = pendingExport
+        pendingExport = null
+        val uri = result.data?.data
+        if (result.resultCode == Activity.RESULT_OK && uri != null && payload != null) {
+            scope.launch {
+                val saved = withContext(Dispatchers.IO) {
+                    runCatching {
+                        context.contentResolver.openOutputStream(uri, "w")?.use {
+                            it.write(payload.bytes)
+                        } ?: error("Document provider refused export")
+                    }.isSuccess
+                }
+                if (!saved) exportFailed = true
+            }
+        }
+    }
     val filePicker = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
         fileCallback?.onReceiveValue(
             WebChromeClient.FileChooserParams.parseResult(result.resultCode, result.data),
@@ -398,7 +423,53 @@ private fun BenchWebView(
             settings.mediaPlaybackRequiresUserGesture = true
             CookieManager.getInstance().setAcceptThirdPartyCookies(this, false)
 
-            val scanOrigins = setOf(if (offline) OfflineCodebench.ORIGIN else Bench.CODE.url)
+            val scanOrigins = setOf(if (offline) OfflineBenches.ORIGIN else Bench.CODE.url)
+            if (offline && WebViewFeature.isFeatureSupported(WebViewFeature.WEB_MESSAGE_LISTENER)) {
+                val originRules = setOf(OfflineBenches.ORIGIN)
+                WebViewCompat.addWebMessageListener(
+                    this, "KanarekExport", originRules,
+                ) { view, message, origin, isMainFrame, _ ->
+                    val currentPage = view.url?.let(Uri::parse)
+                    if (isMainFrame && isTrustedOrigin(origin, trustedOrigin) &&
+                        currentPage?.let { OfflineBenches.isTrustedPage(it, benchKind) } == true
+                    ) {
+                        view.post {
+                            runCatching {
+                                val data = message.data.orEmpty()
+                                if (JSONObject(data).optString("type") == "error") {
+                                    receiver.reset()
+                                    exportFailed = true
+                                } else {
+                                    val payload = receiver.accept(data)
+                                    if (payload != null) {
+                                        if (pendingExport != null) {
+                                            exportFailed = true
+                                        } else {
+                                            pendingExport = payload
+                                            val saveIntent = Intent(Intent.ACTION_CREATE_DOCUMENT).apply {
+                                                addCategory(Intent.CATEGORY_OPENABLE)
+                                                type = payload.mime
+                                                putExtra(Intent.EXTRA_TITLE, payload.name)
+                                            }
+                                            runCatching { exportPicker.launch(saveIntent) }.onFailure {
+                                                pendingExport = null
+                                                exportFailed = true
+                                            }
+                                        }
+                                    }
+                                }
+                            }.onFailure {
+                                receiver.reset()
+                                exportFailed = true
+                            }
+                        }
+                    }
+                }
+                if (WebViewFeature.isFeatureSupported(WebViewFeature.DOCUMENT_START_SCRIPT)) {
+                    WebViewCompat.addDocumentStartJavaScript(this, benchExportJavaScript, originRules)
+                }
+            }
+
             val supportsScanMessages = bench == Bench.CODE &&
                 WebViewFeature.isFeatureSupported(WebViewFeature.WEB_MESSAGE_LISTENER)
             if (supportsScanMessages) {
@@ -425,7 +496,7 @@ private fun BenchWebView(
                     view: WebView?, request: WebResourceRequest?,
                 ): WebResourceResponse? =
                     if (assetLoader != null && request != null)
-                        OfflineCodebench.intercept(assetLoader, request.url)
+                        OfflineBenches.intercept(assetLoader, request.url, benchKind)
                     else null
 
                 override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest?): Boolean {
@@ -438,6 +509,12 @@ private fun BenchWebView(
                 }
 
                 override fun onPageFinished(view: WebView?, url: String?) {
+                    if (offline && url?.let { trustedPage(Uri.parse(it)) } == true &&
+                        WebViewFeature.isFeatureSupported(WebViewFeature.WEB_MESSAGE_LISTENER) &&
+                        !WebViewFeature.isFeatureSupported(WebViewFeature.DOCUMENT_START_SCRIPT)
+                    ) {
+                        view?.evaluateJavascript(benchExportJavaScript, null)
+                    }
                     if (url?.let { trustedPage(Uri.parse(it)) } == true) {
                         startCameraIfRequested(view)
                         deliverFileIfReady(view)
@@ -537,7 +614,19 @@ private fun BenchWebView(
             fileCallback = null
             cameraRequest?.deny()
             cameraRequest = null
+            receiver.reset()
+            pendingExport = null
         }
+    }
+    if (exportFailed) {
+        AlertDialog(
+            onDismissRequest = { exportFailed = false },
+            title = { Text(stringResource(R.string.tools_export_failed_title)) },
+            text = { Text(stringResource(R.string.tools_export_failed)) },
+            confirmButton = {
+                TextButton(onClick = { exportFailed = false }) { Text(stringResource(R.string.close)) }
+            },
+        )
     }
     AndroidView(
         factory = { webView },
