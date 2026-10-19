@@ -9,7 +9,8 @@ import java.io.ByteArrayInputStream
 // Codebench's single-file build is staged from a pinned twojstar commit.
 // Missing asset (e.g. a plain F-Droid build): retain the hosted preview.
 internal object OfflineCodebench {
-    const val URL = "https://appassets.androidplatform.net/bench/portable.html"
+    const val ORIGIN = "https://appassets.androidplatform.net"
+    const val URL = "$ORIGIN/bench/portable.html"
     private const val ASSET = "benches/codebench/portable.html"
 
     fun isBundled(context: Context): Boolean =

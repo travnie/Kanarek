@@ -11,6 +11,7 @@ import android.webkit.PermissionRequest
 import android.webkit.ValueCallback
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceRequest
+import android.webkit.WebResourceResponse
 import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
@@ -131,6 +132,7 @@ internal fun ToolsScreen(
     onFileHandled: (Long) -> Unit,
 ) {
     val context = LocalContext.current
+    val bundledCodebench = remember(context) { OfflineCodebench.isBundled(context) }
     val scope = rememberCoroutineScope()
     val importFailureMessage = stringResource(R.string.open_with_failed)
     val tooLargeMessage = stringResource(R.string.open_with_too_large)
@@ -172,13 +174,13 @@ internal fun ToolsScreen(
             ) {
                 item {
                     Text(
-                        stringResource(R.string.tools_intro),
+                        stringResource(if (bundledCodebench) R.string.tools_offline_intro else R.string.tools_intro),
                         modifier = Modifier.padding(vertical = 12.dp),
                     )
                 }
                 item {
                     Text(
-                        stringResource(R.string.tools_online_hint),
+                        stringResource(if (bundledCodebench) R.string.tools_hybrid_hint else R.string.tools_online_hint),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(bottom = 4.dp),
@@ -196,7 +198,12 @@ internal fun ToolsScreen(
                             leadingContent = { Icon(bench.icon, contentDescription = null) },
                             headlineContent = { Text(bench.label) },
                             supportingContent = { Text(stringResource(bench.summaryRes)) },
-                            trailingContent = { Text(stringResource(R.string.tools_open)) },
+                            trailingContent = {
+                                Text(stringResource(
+                                    if (bench == Bench.CODE && bundledCodebench) R.string.tools_offline_badge
+                                    else R.string.tools_open,
+                                ))
+                            },
                         )
                     }
                 }
@@ -241,7 +248,10 @@ internal fun ToolsScreen(
                 text = {
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         Text(source.filename)
-                        Text(stringResource(R.string.open_with_privacy))
+                        Text(stringResource(
+                            if (bundledCodebench) R.string.open_with_offline_privacy
+                            else R.string.open_with_privacy,
+                        ))
                         options.forEach { target ->
                             TextButton(onClick = {
                                 processingFileId = source.id
@@ -318,7 +328,17 @@ private fun BenchWebView(
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
-    val trustedOrigin = remember(bench) { Uri.parse(bench.url) }
+    val offline = remember(bench, context) {
+        bench == Bench.CODE && OfflineCodebench.isBundled(context)
+    }
+    val pageUrl = OfflineCodebench.destination(offline, bench.url)
+    val trustedOrigin = remember(pageUrl) { Uri.parse(pageUrl) }
+    val assetLoader = remember(offline, context) {
+        if (offline) OfflineCodebench.loader(context) else null
+    }
+    fun trustedPage(target: Uri): Boolean =
+        if (offline) OfflineCodebench.isTrustedPage(target)
+        else isTrustedOrigin(target, trustedOrigin)
     var fileCallback by remember { mutableStateOf<ValueCallback<Array<Uri>>?>(null) }
     var cameraRequest by remember { mutableStateOf<PermissionRequest?>(null) }
     var startedScanRequest by remember(bench) { mutableIntStateOf(0) }
@@ -334,7 +354,7 @@ private fun BenchWebView(
             incoming.target.name != bench.name || dispatchedFileId == incoming.id
         ) return
         val currentUrl = view.url?.let(Uri::parse) ?: return
-        if (!isTrustedOrigin(currentUrl, trustedOrigin)) return
+        if (!trustedPage(currentUrl)) return
         dispatchedFileId = incoming.id
         view.evaluateJavascript(IncomingBenchFiles.importJavascript(incoming)) { result ->
             currentImportFinished(result?.trim() == "true")
@@ -378,7 +398,7 @@ private fun BenchWebView(
             settings.mediaPlaybackRequiresUserGesture = true
             CookieManager.getInstance().setAcceptThirdPartyCookies(this, false)
 
-            val scanOrigins = setOf(Bench.CODE.url)
+            val scanOrigins = setOf(if (offline) OfflineCodebench.ORIGIN else Bench.CODE.url)
             val supportsScanMessages = bench == Bench.CODE &&
                 WebViewFeature.isFeatureSupported(WebViewFeature.WEB_MESSAGE_LISTENER)
             if (supportsScanMessages) {
@@ -401,9 +421,16 @@ private fun BenchWebView(
             }
 
             webViewClient = object : WebViewClient() {
+                override fun shouldInterceptRequest(
+                    view: WebView?, request: WebResourceRequest?,
+                ): WebResourceResponse? =
+                    if (assetLoader != null && request != null)
+                        OfflineCodebench.intercept(assetLoader, request.url)
+                    else null
+
                 override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest?): Boolean {
                     val target = request?.url ?: return true
-                    if (isTrustedOrigin(target, trustedOrigin)) return false
+                    if (trustedPage(target)) return false
                     if (request.isForMainFrame && target.scheme == "https") {
                         runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, target)) }
                     }
@@ -411,13 +438,13 @@ private fun BenchWebView(
                 }
 
                 override fun onPageFinished(view: WebView?, url: String?) {
-                    if (url?.let { isTrustedOrigin(Uri.parse(it), trustedOrigin) } == true) {
+                    if (url?.let { trustedPage(Uri.parse(it)) } == true) {
                         startCameraIfRequested(view)
                         deliverFileIfReady(view)
                     }
                     if (supportsScanMessages &&
                         !WebViewFeature.isFeatureSupported(WebViewFeature.DOCUMENT_START_SCRIPT) &&
-                        url?.let { isTrustedOrigin(Uri.parse(it), trustedOrigin) } == true
+                        url?.let { trustedPage(Uri.parse(it)) } == true
                     ) {
                         view?.evaluateJavascript(codeScanObserver, null)
                     }
@@ -426,7 +453,7 @@ private fun BenchWebView(
                 // shouldOverrideUrlLoading is not called for POST navigation.
                 override fun onPageStarted(view: WebView?, url: String?, favicon: Bitmap?) {
                     val target = url?.let(Uri::parse)
-                    if (target == null || !isTrustedOrigin(target, trustedOrigin)) view?.stopLoading()
+                    if (target == null || !trustedPage(target)) view?.stopLoading()
                 }
             }
             webChromeClient = object : WebChromeClient() {
@@ -441,7 +468,7 @@ private fun BenchWebView(
                     if (filePathCallback == null) return false
                     val currentPage = webView?.url?.let(Uri::parse)
                     if (fileCallback != null || currentPage == null ||
-                        !isTrustedOrigin(currentPage, trustedOrigin)
+                        !trustedPage(currentPage)
                     ) {
                         filePathCallback.onReceiveValue(null)
                         return true
@@ -481,7 +508,7 @@ private fun BenchWebView(
                     if (cameraRequest === request) cameraRequest = null
                 }
             }
-            loadUrl(bench.url)
+            loadUrl(pageUrl)
         }
     }
 
