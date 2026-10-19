@@ -13,19 +13,26 @@ import org.robolectric.annotation.Config
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [33])
 class OfflineBenchesTest {
+    @Test fun benchAssetMappingIsExplicit() {
+        assertEquals("codebench", BenchKind.CODE.slug)
+        assertEquals("docbench", BenchKind.DOC.slug)
+        assertEquals("streambench", BenchKind.STREAM.slug)
+        assertEquals(3, BenchKind.entries.size)
+    }
+
     @Test fun localOriginsAreIsolated() {
-        for (name in listOf("codebench", "docbench", "streambench")) {
-            assertTrue(OfflineBenches.isTrustedPage(Uri.parse(OfflineBenches.url(name)), name))
-            assertTrue(OfflineBenches.isTrustedPage(Uri.parse(OfflineBenches.url(name) + "#editor"), name))
-            assertFalse(OfflineBenches.isTrustedPage(Uri.parse(OfflineBenches.url(name)), "other"))
-            assertFalse(OfflineBenches.isTrustedPage(Uri.parse(OfflineBenches.url(name) + "?q=1"), name))
-            assertFalse(OfflineBenches.isTrustedPage(Uri.parse("http://appassets.androidplatform.net/benches/$name/portable.html"), name))
+        for (kind in BenchKind.entries) {
+            assertTrue(OfflineBenches.isTrustedPage(Uri.parse(OfflineBenches.url(kind)), kind))
+            assertTrue(OfflineBenches.isTrustedPage(Uri.parse(OfflineBenches.url(kind) + "#editor"), kind))
+            assertFalse(OfflineBenches.isTrustedPage(Uri.parse(OfflineBenches.url(kind)), BenchKind.DOC))
+            assertFalse(OfflineBenches.isTrustedPage(Uri.parse(OfflineBenches.url(kind) + "?q=1"), kind))
+            assertFalse(OfflineBenches.isTrustedPage(Uri.parse("http://appassets.androidplatform.net/benches/${kind.slug}/portable.html"), kind))
         }
     }
 
     @Test fun eachBenchHasSeparateStorageOrigin() {
-        assertFalse(OfflineBenches.origin("codebench") == OfflineBenches.origin("docbench"))
-        assertFalse(OfflineBenches.origin("docbench") == OfflineBenches.origin("streambench"))
+        assertFalse(OfflineBenches.origin(BenchKind.CODE) == OfflineBenches.origin(BenchKind.DOC))
+        assertFalse(OfflineBenches.origin(BenchKind.DOC) == OfflineBenches.origin(BenchKind.STREAM))
     }
 
     @Test fun onlyExistingRestrictedBackendIsAllowed() {
@@ -37,13 +44,13 @@ class OfflineBenchesTest {
 
     @Test fun bundledPageOrHostedFallback() {
         val context = RuntimeEnvironment.getApplication()
-        for (name in listOf("codebench", "docbench", "streambench")) {
-            val loader = OfflineBenches.loader(context, name)
-            val served = loader.shouldInterceptRequest(Uri.parse(OfflineBenches.url(name)))
-            assertEquals(OfflineBenches.isBundled(context, name), served != null)
+        for (kind in BenchKind.entries) {
+            val loader = OfflineBenches.loader(context, kind)
+            val served = loader.shouldInterceptRequest(Uri.parse(OfflineBenches.url(kind)))
+            assertEquals(OfflineBenches.isBundled(context, kind), served != null)
             served?.data?.close()
             assertEquals("https://example.com", OfflineBenches.destination(false, name, "https://example.com"))
-            assertEquals(OfflineBenches.url(name), OfflineBenches.destination(true, name, "https://example.com"))
+            assertEquals(OfflineBenches.url(kind), OfflineBenches.destination(true, name, "https://example.com"))
             assertEquals(403, OfflineBenches.intercept(
                 loader, Uri.parse("https://blocked.test/tracker"), name,
             )?.statusCode)

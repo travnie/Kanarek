@@ -31,39 +31,44 @@ replace Streambench's allowlisted relay with an unrestricted proxy.
 
 ## Delivery slices
 
-**Codebench offline (GitHub APK slice):** `stage-codebench.sh` builds the upstream
-single-file Codebench at a pinned twojstar commit during Android CI and rolling
-release builds. Both Play/FOSS APKs include the HTML, WASM, JS, and fonts via
-one asset. `WebViewAssetLoader` serves it from an HTTPS app origin; unrelated
-network requests are denied. An unstaged local/F-Droid build still uses the
-hosted Codebench and never claims offline support. File imports and camera
-scanning reuse the existing guarded WebView interface. Native save/export,
-Docbench and Streambench bundling, and physical device verification remain open.
+**Offline Benches (GitHub APK slice):** `stage-benches.sh` produces the
+single-file Codebench, Docbench and Streambench portable assets from one pinned
+twojstar source commit. Each Bench is served from its own HTTPS app origin via
+`WebViewAssetLoader`; no external service is required for its bundled tools.
+The user's optional Online toggle opens the existing hosted Bench, while
+Streambench's provider/relay API still needs a network connection. Builds
+without staged assets fall back to their hosted counterparts.
+
+User-requested Blob exports open Android `ACTION_CREATE_DOCUMENT` (32 MiB
+limit); importing external files remains limited to 4 MiB in the preview.
+Android permission is scoped to the selected document, not broad storage.
+Offline camera/file import uses the existing guarded WebView interface.
+Real-device QR/PDF/playlist verification remains outstanding.
 
 To stage locally, install Node 24, git and npm, then run:
 
 ```sh
-bash .github/scripts/stage-codebench.sh
+bash .github/scripts/stage-benches.sh
 ```
 
-Assets under `app/src/main/assets/benches/` are generated and ignored. The
-pin and build logic live in the script; Bench sources stay maintained only in
-twojstar. A staged APK remains offline without contacting GitHub at runtime.
+Generated assets under `app/src/main/assets/benches/` are ignored.
+The build revision and expected hashes live in the one staging script;
+the maintained Bench source remains exclusively in twojstar.
 
 ### 1. Native Tools hub (initial PR)
 
 - Add a third Compose destination reachable via the existing pager, bottom bar
   and drawer; keep reader/player navigation and MediaSession lifetime intact.
-- Open each existing **hosted** Bench inside an isolated WebView on selection.
+- Open each Bench in its bundled WebView when present, with hosted preview fallback.
   Enable Android camera permission for trusted Codebench origin and OS file
   picking for user-selected inputs. No JavaScript interface or broad storage
   permission. Block mixed content and external in-WebView navigation.
-- Hosted mode is a transitional preview: it requires a network connection;
+- Hosted mode requires a network connection;
   browser downloads and all workflows are not yet guaranteed inside WebView.
   Switching away unloads the preview, including unsaved in-memory edits, to
   stop hidden camera/media activity. Save or export first; this tradeoff can be
   revisited when bundled sandboxes and native file state are implemented.
-  Do not describe it as offline-capable or native-export-complete.
+  Do not describe hosted mode as offline-capable or native-export-complete.
 - Build both `play` and `foss` variants, exercise navigation/back, picker,
   scanner permissions and offline reader/player regression checks.
 

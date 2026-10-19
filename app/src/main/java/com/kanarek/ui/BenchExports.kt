@@ -75,7 +75,7 @@ internal val benchExportJavaScript = """
   const eligible = a => a instanceof HTMLAnchorElement && a.hasAttribute('download') &&
     (a.href.startsWith('blob:') || a.href.startsWith('data:'));
   async function transfer(a) {
-    if (busy) { send({type: 'error'}); return; }
+    if (busy) return;
     busy = true;
     try {
       const response = await fetch(a.href);

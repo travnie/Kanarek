@@ -6,25 +6,28 @@ import android.webkit.WebResourceResponse
 import androidx.webkit.WebViewAssetLoader
 import java.io.ByteArrayInputStream
 
-// Same pinned twojstar source, isolated per-Bench pages.
+// One typed source of truth for the asset paths and their per-Bench origins.
+internal enum class BenchKind(val slug: String) {
+    CODE("codebench"), DOC("docbench"), STREAM("streambench"),
+}
+
 internal object OfflineBenches {
-    private val kinds = setOf("codebench", "docbench", "streambench")
     private const val BACKEND = "streambench.travny.workers.dev"
 
-    fun origin(kind: String) = "https://$kind.appassets.androidplatform.net"
-    fun url(kind: String) = origin(kind) + "/bench/portable.html"
+    fun origin(kind: BenchKind) = "https://${kind.slug}.appassets.androidplatform.net"
+    fun url(kind: BenchKind) = origin(kind) + "/bench/portable.html"
 
-    fun isBundled(context: Context, kind: String): Boolean =
-        kind in kinds && runCatching {
-            context.assets.open("benches/$kind/portable.html").use { it.read() >= 0 }
+    fun isBundled(context: Context, kind: BenchKind): Boolean =
+        runCatching {
+            context.assets.open("benches/${kind.slug}/portable.html").use { it.read() >= 0 }
         }.getOrDefault(false)
 
-    fun destination(bundled: Boolean, kind: String, hosted: String) =
-        if (bundled && kind in kinds) url(kind) else hosted
+    fun destination(bundled: Boolean, kind: BenchKind, hosted: String) =
+        if (bundled) url(kind) else hosted
 
-    fun isTrustedPage(uri: Uri, kind: String) =
-        kind in kinds && uri.scheme == "https" &&
-            uri.host == "$kind.appassets.androidplatform.net" &&
+    fun isTrustedPage(uri: Uri, kind: BenchKind) =
+        uri.scheme == "https" &&
+            uri.host == "${kind.slug}.appassets.androidplatform.net" &&
             uri.port == -1 && uri.path == "/bench/portable.html" &&
             uri.query == null
 
@@ -32,28 +35,27 @@ internal object OfflineBenches {
         uri.scheme == "https" && uri.host == BACKEND && uri.port == -1 &&
             (uri.path == "/api" || uri.path?.startsWith("/api/") == true)
 
-    fun loader(context: Context, kind: String): WebViewAssetLoader {
-        require(kind in kinds)
+    fun loader(context: Context, kind: BenchKind): WebViewAssetLoader {
         return WebViewAssetLoader.Builder()
-            .setDomain("$kind.appassets.androidplatform.net")
+            .setDomain("${kind.slug}.appassets.androidplatform.net")
             .addPathHandler("/bench/", WebViewAssetLoader.PathHandler { path ->
                 if (path != "portable.html") return@PathHandler null
                 runCatching {
                     WebResourceResponse(
                         "text/html", "UTF-8",
-                        context.assets.open("benches/$kind/portable.html"),
+                        context.assets.open("benches/${kind.slug}/portable.html"),
                     )
                 }.getOrNull()
             }).build()
     }
 
-    fun intercept(loader: WebViewAssetLoader, uri: Uri, kind: String): WebResourceResponse? {
+    fun intercept(loader: WebViewAssetLoader, uri: Uri, kind: BenchKind): WebResourceResponse? {
         if (uri.scheme in setOf("data", "blob", "content")) return null
         if (isTrustedPage(uri, kind)) {
             loader.shouldInterceptRequest(uri)?.let { return it }
         }
         // Existing restricted Worker, not a native general-purpose proxy.
-        if (kind == "streambench" && isAllowedStreamBackend(uri)) return null
+        if (kind == BenchKind.STREAM && isAllowedStreamBackend(uri)) return null
         return WebResourceResponse(
             "text/plain", "UTF-8", ByteArrayInputStream(ByteArray(0)),
         ).apply { setStatusCodeAndReasonPhrase(403, "Forbidden") }

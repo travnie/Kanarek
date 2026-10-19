@@ -118,10 +118,11 @@ private enum class Bench(
     val summaryRes: Int,
     val url: String,
     val icon: ImageVector,
+    val kind: BenchKind,
 ) {
-    CODE("Codebench", R.string.tools_codebench_description, "https://codebench.trfny.com", Icons.Filled.QrCodeScanner),
-    DOC("Docbench", R.string.tools_docbench_description, "https://docbench.travny.workers.dev", Icons.Filled.Description),
-    STREAM("Streambench", R.string.tools_streambench_description, "https://streambench.trfny.com", Icons.Filled.Tv),
+    CODE("Codebench", R.string.tools_codebench_description, "https://codebench.trfny.com", Icons.Filled.QrCodeScanner, BenchKind.CODE),
+    DOC("Docbench", R.string.tools_docbench_description, "https://docbench.travny.workers.dev", Icons.Filled.Description, BenchKind.DOC),
+    STREAM("Streambench", R.string.tools_streambench_description, "https://streambench.trfny.com", Icons.Filled.Tv, BenchKind.STREAM),
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -136,7 +137,7 @@ internal fun ToolsScreen(
 ) {
     val context = LocalContext.current
     val bundledBenches = remember(context) {
-        Bench.entries.associateWith { OfflineBenches.isBundled(context, it.name.lowercase()) }
+        Bench.entries.associateWith { OfflineBenches.isBundled(context, it.kind) }
     }
     val scope = rememberCoroutineScope()
     val importFailureMessage = stringResource(R.string.open_with_failed)
@@ -356,7 +357,7 @@ private fun BenchWebView(
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     val scope = rememberCoroutineScope()
-    val benchKind = remember(bench) { bench.name.lowercase() }
+    val benchKind = bench.kind
     val offline = remember(bench, context, useHosted) {
         !useHosted && OfflineBenches.isBundled(context, benchKind)
     }
