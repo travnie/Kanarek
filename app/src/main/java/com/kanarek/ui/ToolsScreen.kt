@@ -285,6 +285,7 @@ internal fun ToolsScreen(
                                     try {
                                         val ready = IncomingBenchFiles.prepare(context, source, target)
                                         preparedFile = ready
+                                        useHosted = false
                                         selectedKey = target.name
                                     } catch (error: Exception) {
                                         fileError =
