@@ -206,7 +206,10 @@ internal fun ToolsScreen(
                 }
                 item {
                     Text(
-                        stringResource(if (bundledBenches.values.all { it }) R.string.tools_all_offline_hint else R.string.tools_online_hint),
+                        stringResource(
+                            if (bundledBenches.values.all { it }) R.string.tools_all_offline_hint
+                            else R.string.tools_online_hint,
+                        ),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(bottom = 4.dp),
