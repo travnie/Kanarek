@@ -114,9 +114,14 @@ private val codeScanObserver = """
 """.trimIndent()
 
 // Do not destroy the bundled editor for a hosted page that cannot be reached.
-internal fun hasHostedConnection(capabilities: NetworkCapabilities?): Boolean =
-    capabilities?.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) == true &&
-        capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)
+internal fun shouldUseHostedInternet(hasInternet: Boolean, validated: Boolean): Boolean =
+    hasInternet && validated
+
+private fun hasHostedConnection(capabilities: NetworkCapabilities?): Boolean =
+    shouldUseHostedInternet(
+        capabilities?.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) == true,
+        capabilities?.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED) == true,
+    )
 
 private fun hasHostedConnection(context: Context): Boolean = runCatching {
     val manager = context.getSystemService(Context.CONNECTIVITY_SERVICE)
