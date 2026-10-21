@@ -160,19 +160,9 @@ jobs:
             sleep 5
             for i in 1 2 3; do adb shell uiautomator dump /sdcard/tools-ui.xml | grep -q dumped && break; sleep 3; done
             adb pull /sdcard/tools-ui.xml out/tools-ui.xml
-            python3 - <<'PY'
-            import re
-            import subprocess
-            import xml.etree.ElementTree as ET
-            nodes = ET.parse("out/tools-ui.xml").iter("node")
-            matches = [node for node in nodes if
-                       "Docbench" in (node.get("text", "") + " " + node.get("content-desc", ""))]
-            assert matches, "offline Tools hub did not expose Docbench"
-            numbers = list(map(int, re.findall(r"\d+", matches[0].get("bounds", ""))))
-            assert len(numbers) == 4, "Docbench target bounds missing"
-            x, y = (numbers[0] + numbers[2]) // 2, (numbers[1] + numbers[3]) // 2
-            subprocess.run(["adb", "shell", "input", "tap", str(x), str(y)], check=True)
-            PY
+            # The emulator composite action runs each script line separately:
+            # keep the UIAutomator lookup + tap in one shell command.
+            python3 -c 'import re, subprocess, xml.etree.ElementTree as E; n=next(x for x in E.parse("out/tools-ui.xml").iter("node") if "Docbench" in (x.get("text","") + " " + x.get("content-desc",""))); b=list(map(int,re.findall(r"\d+",n.get("bounds","")))); assert len(b)==4; subprocess.run(["adb","shell","input","tap",str((b[0]+b[2])//2),str((b[1]+b[3])//2)],check=True)'
             sleep 10
             adb shell pidof com.kanarek
             adb exec-out screencap -p > out/docbench-offline.png
