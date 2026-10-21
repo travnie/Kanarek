@@ -396,9 +396,23 @@ private fun BenchWebView(
         ) return
         val currentUrl = view.url?.let(Uri::parse) ?: return
         if (!trustedPage(currentUrl)) return
+        // Guard before launching: both onProgressChanged and onPageFinished can
+        // request the same import. Base64/JSON serialization can be several MB,
+        // so build the script off the UI thread to avoid blocking touch input.
         dispatchedFileId = incoming.id
-        view.evaluateJavascript(IncomingBenchFiles.importJavascript(incoming)) { result ->
-            currentImportFinished(result?.trim() == "true")
+        scope.launch {
+            val script = withContext(Dispatchers.Default) {
+                IncomingBenchFiles.importJavascript(incoming)
+            }
+            if (view.url?.let(Uri::parse)?.let(::trustedPage) != true ||
+                view.progress < 100
+            ) {
+                currentImportFinished(false)
+                return@launch
+            }
+            view.evaluateJavascript(script) { result ->
+                currentImportFinished(result?.trim() == "true")
+            }
         }
     }
 
