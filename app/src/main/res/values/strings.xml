@@ -50,6 +50,9 @@
     <string name="filter_saved_articles">Saved</string>
     <string name="filter_all_sources">All sources</string>
     <string name="reader_sources">Sources</string>
+    <string name="reader_channels_button">Channels</string>
+    <string name="reader_subscriptions">Subscriptions</string>
+    <string name="reader_all_subscriptions">All channels</string>
     <string name="search_sources">Search sources</string>
     <string name="add_source_favorite">Add source to favorites</string>
     <string name="remove_source_favorite">Remove source from favorites</string>

@@ -50,6 +50,9 @@
     <string name="filter_saved_articles">Zapisane</string>
     <string name="filter_all_sources">Wszystkie źródła</string>
     <string name="reader_sources">Źródła</string>
+    <string name="reader_channels_button">Kanały</string>
+    <string name="reader_subscriptions">Subskrypcje</string>
+    <string name="reader_all_subscriptions">Wszystkie kanały</string>
     <string name="search_sources">Szukaj źródeł</string>
     <string name="add_source_favorite">Dodaj źródło do ulubionych</string>
     <string name="remove_source_favorite">Usuń źródło z ulubionych</string>

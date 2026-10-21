@@ -101,6 +101,8 @@ internal fun ReaderScreen(
     var refreshRequestId by remember { mutableIntStateOf(0) }
     var showAddSite by rememberSaveable { mutableStateOf(false) }
     var showSourcePicker by rememberSaveable { mutableStateOf(false) }
+    var selectedFeedUrl by rememberSaveable { mutableStateOf<String?>(null) }
+    var subscriptionItems by remember { mutableStateOf<Map<String, List<NewsItem>>>(emptyMap()) }
     var navigation by
         rememberSaveable(stateSaver = ReaderNavigationStateSaver) {
             mutableStateOf(ReaderNavigationState())
@@ -138,17 +140,25 @@ internal fun ReaderScreen(
         refreshJob?.cancel()
         val requestId = refreshRequestId + 1
         refreshRequestId = requestId
-        val config = ReaderFeedSyncConfig(feeds, backend, cap)
+        // Keep caches for ALL subscriptions when showing a single channel.
+        val config = ReaderFeedSyncConfig(
+            feeds = feeds,
+            backendUrl = backend,
+            perSourceCap = cap,
+            retainedFeeds = (savedFeeds + feeds).distinct(),
+        )
         refreshJob =
             scope.launch {
                 loading = preview.isEmpty()
-                val cached =
+                val (cached, subscriptions) =
                     withContext(Dispatchers.IO) {
-                        feedSynchronizer.cachedItems(config, limit = READER_ITEM_LIMIT)
+                        feedSynchronizer.cachedItems(config, limit = READER_ITEM_LIMIT) to
+                            feedSynchronizer.cachedSubscriptionItems(savedFeeds)
                     }
-                if (requestId == refreshRequestId && cached.isNotEmpty()) {
+                if (requestId == refreshRequestId) {
+                    subscriptionItems = subscriptions
                     preview = cached
-                    loading = false
+                    if (cached.isNotEmpty()) loading = false
                 }
                 val result =
                     try {
@@ -158,7 +168,11 @@ internal fun ReaderScreen(
                     } catch (_: Exception) {
                         null
                     }
+                val updatedSubscriptions = withContext(Dispatchers.IO) {
+                    feedSynchronizer.cachedSubscriptionItems(savedFeeds)
+                }
                 if (requestId == refreshRequestId) {
+                    subscriptionItems = updatedSubscriptions
                     result?.let { preview = it.items }
                     loading = false
                     refreshJob = null
@@ -174,8 +188,13 @@ internal fun ReaderScreen(
         navigateBack()
     }
 
-    LaunchedEffect(savedFeeds, savedBackend, perSourceCap) {
-        loadPreview(savedFeeds, savedBackend, perSourceCap)
+    val activeFeeds = selectedFeedUrl?.takeIf(savedFeeds::contains)?.let(::listOf) ?: savedFeeds
+    LaunchedEffect(savedFeeds, selectedFeedUrl, savedBackend, perSourceCap) {
+        if (selectedFeedUrl != null && selectedFeedUrl !in savedFeeds) {
+            selectedFeedUrl = null
+        } else {
+            loadPreview(activeFeeds, savedBackend, perSourceCap)
+        }
     }
 
     fun openArticleExternally(link: String) {
@@ -228,6 +247,7 @@ internal fun ReaderScreen(
     fun addFeedUrl(url: String) {
         val merged = (parseFeedField() + url).distinct()
         feedText = merged.joinToString(",\n")
+        selectedFeedUrl = null
         scope.launch {
             settings.setFeeds(merged.joinToString(","))
             KanarekWidgetProvider.refreshAll(context)
@@ -250,6 +270,7 @@ internal fun ReaderScreen(
                 val merged = (parseFeedField() + Opml.parse(text)).distinct()
                 if (merged.isEmpty()) return@launch
                 feedText = merged.joinToString(",\n")
+                selectedFeedUrl = null
                 settings.setFeeds(merged.joinToString(","))
                 KanarekWidgetProvider.refreshAll(context)
                 loadPreview(merged, savedBackend)
@@ -274,26 +295,28 @@ internal fun ReaderScreen(
         }
 
     val feedItems =
-        remember(preview, headlinesMode, topSources) {
-            if (headlinesMode) {
+        remember(preview, headlinesMode, topSources, selectedFeedUrl) {
+            if (headlinesMode && selectedFeedUrl == null) {
                 Headlines.headlines(preview, topSources = topSources, limit = READER_ITEM_LIMIT)
             } else {
                 preview
             }
         }
-    val sourceOptions =
-        remember(feedItems, articleState.savedArticles, filters.sources) {
-            readerSourceOptions(
-                feedItems = feedItems,
-                savedArticles = articleState.savedArticles,
-                selectedSources = filters.sources,
-            )
-        }
+    val subscriptions = remember(savedFeeds, subscriptionItems) {
+        readerSubscriptions(savedFeeds, subscriptionItems)
+    }
+    val selectedSubscription = subscriptions.firstOrNull { it.url == selectedFeedUrl }
+    val scopedArticleState = remember(articleState, selectedFeedUrl, feedItems) {
+        if (selectedFeedUrl == null) articleState
+        else articleState.copy(
+            savedArticles = savedArticlesFromSubscription(articleState.savedArticles, feedItems),
+        )
+    }
     val shown =
-        remember(feedItems, articleState, filters) {
+        remember(feedItems, scopedArticleState, filters) {
             ArticleStates.visible(
                 feedItems = feedItems,
-                state = articleState,
+                state = scopedArticleState,
                 filter = filters.filter,
                 query = filters.query,
                 sources = filters.sources,
@@ -331,7 +354,7 @@ internal fun ReaderScreen(
                 route = navigation.route,
                 onBack = ::navigateBack,
                 onMenu = onMenu,
-                onRefresh = { loadPreview(savedFeeds, savedBackend) },
+                onRefresh = { loadPreview(activeFeeds, savedBackend) },
                 onOpenSources = { showSourcePicker = true },
                 onSettings = {
                     navigation = navigation.open(ReaderRoute.SETTINGS)
@@ -348,12 +371,16 @@ internal fun ReaderScreen(
                             .fillMaxSize()
                             .padding(padding),
                 ) {
+                    ReaderSubscriptionBar(
+                        selectedTitle = selectedSubscription?.title,
+                        onOpen = { showSourcePicker = true },
+                    )
                     ReaderListPane(
                         items = shown,
                         loading = loading,
                         filters = filters,
                         sourceOptions = emptyList(),
-                        articleState = articleState,
+                        articleState = scopedArticleState,
                         onFiltersChange = { updated ->
                             filters =
                                 if (
@@ -421,6 +448,7 @@ internal fun ReaderScreen(
                             val feeds = parseFeedField()
                             val backend = effectiveBackend.trim()
                             scope.launch {
+                                selectedFeedUrl = null
                                 settings.setFeeds(feeds.joinToString(","))
                                 settings.setBackendUrl(backend)
                                 KanarekWidgetProvider.refreshAll(context)
@@ -561,15 +589,19 @@ internal fun ReaderScreen(
 
         if (showSourcePicker) {
             ReaderSourceListDialog(
-                sources = sourceOptions,
-                selectedSources = filters.sources,
+                subscriptions = subscriptions,
+                selectedFeedUrl = selectedFeedUrl,
                 favoriteSources = topSources,
-                onSelectSource = { source ->
-                    filters = filters.copy(sources = setOf(source))
+                onSelectFeed = { feedUrl ->
+                    selectedFeedUrl = feedUrl
+                    preview = emptyList()
+                    filters = filters.copy(filter = ArticleListFilter.ALL, sources = emptySet(), query = "")
                     showSourcePicker = false
                 },
-                onClearSources = {
-                    filters = filters.copy(sources = emptySet())
+                onAllFeeds = {
+                    selectedFeedUrl = null
+                    preview = emptyList()
+                    filters = filters.copy(filter = ArticleListFilter.ALL, sources = emptySet(), query = "")
                     showSourcePicker = false
                 },
                 onToggleFavorite = ::toggleTopSource,
