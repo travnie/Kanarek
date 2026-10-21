@@ -318,11 +318,12 @@ internal fun ReaderScreen(
     }
     val selectedSubscription = subscriptions.firstOrNull { it.url == selectedFeedUrl }
     val scopedArticleState = remember(articleState, selectedFeedUrl, subscriptionItems) {
-        if (selectedFeedUrl == null) articleState
+        val activeSubscription = selectedFeedUrl
+        if (activeSubscription == null) articleState
         else articleState.copy(
             savedArticles = savedArticlesFromSubscription(
                 articleState.savedArticles,
-                selectedFeedUrl,
+                activeSubscription,
                 articleState.savedFeedByArticle,
                 subscriptionItems,
             ),
