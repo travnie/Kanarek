@@ -86,7 +86,7 @@ internal fun ReaderScreen(
 
     val savedFeeds by
         settings.feeds.collectAsStateWithLifecycle(
-            initialValue = NewsRepository.DEFAULT_FEEDS,
+            initialValue = emptyList(),
         )
     val savedBackend by settings.backendUrl.collectAsStateWithLifecycle(initialValue = "")
 
@@ -194,8 +194,10 @@ internal fun ReaderScreen(
         navigateBack()
     }
 
-    val activeFeeds = selectedFeedUrl?.takeIf(savedFeeds::contains)?.let(::listOf) ?: savedFeeds
+    val activeFeeds = readerActiveFeeds(savedFeeds, selectedFeedUrl)
     LaunchedEffect(savedFeeds, selectedFeedUrl, savedBackend, perSourceCap) {
+        // Empty is the sentinel before the first DataStore emission, not a real feed list.
+        if (savedFeeds.isEmpty()) return@LaunchedEffect
         if (selectedFeedUrl != null && selectedFeedUrl !in savedFeeds) {
             selectedFeedUrl = null
         } else {
@@ -228,8 +230,11 @@ internal fun ReaderScreen(
     ) {
         val adding = !articleState.isSaved(item)
         val readerBackend = configuredReaderBackend(savedBackend)
+        val savedFromFeed = selectedFeedUrl ?: subscriptionItems.entries.firstOrNull { (_, items) ->
+            items.any { ArticleStates.id(it) == ArticleStates.id(item) }
+        }?.key
         scope.launch {
-            articleStateStore.toggleSaved(item)
+            articleStateStore.toggleSaved(item, savedFromFeed)
             if (!adding || !offlineSavedArticles) return@launch
             val offlineArticle =
                 cleanArticle
@@ -312,10 +317,15 @@ internal fun ReaderScreen(
         readerSubscriptions(savedFeeds, subscriptionItems)
     }
     val selectedSubscription = subscriptions.firstOrNull { it.url == selectedFeedUrl }
-    val scopedArticleState = remember(articleState, selectedFeedUrl, feedItems) {
+    val scopedArticleState = remember(articleState, selectedFeedUrl, subscriptionItems) {
         if (selectedFeedUrl == null) articleState
         else articleState.copy(
-            savedArticles = savedArticlesFromSubscription(articleState.savedArticles, feedItems),
+            savedArticles = savedArticlesFromSubscription(
+                articleState.savedArticles,
+                selectedFeedUrl,
+                articleState.savedFeedByArticle,
+                subscriptionItems,
+            ),
         )
     }
     val shown =

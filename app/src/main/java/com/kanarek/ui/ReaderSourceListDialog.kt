@@ -78,7 +78,9 @@ internal fun ReaderSourceListDialog(
     val sorted = remember(subscriptions, favoriteSources) {
         subscriptions.sortedWith(
             compareByDescending<ReaderSubscription> { sub ->
-                favoriteSources.any { it.equals(sub.title, ignoreCase = true) }
+                sub.favoriteSource?.let { favorite ->
+                    favoriteSources.any { it.equals(favorite, ignoreCase = true) }
+                } == true
             }.thenBy(String.CASE_INSENSITIVE_ORDER) { it.title },
         )
     }
@@ -114,8 +116,8 @@ internal fun ReaderSourceListDialog(
                         )
                     }
                     items(filtered, key = { it.url }) { subscription ->
-                        val favorite = favoriteSources.any {
-                            it.equals(subscription.title, ignoreCase = true)
+                        val favorite = subscription.favoriteSource?.let { name ->
+                            favoriteSources.any { it.equals(name, ignoreCase = true) }
                         }
                         ReaderSubscriptionRow(
                             title = subscription.title,
@@ -123,7 +125,9 @@ internal fun ReaderSourceListDialog(
                             selected = selectedFeedUrl == subscription.url,
                             favorite = favorite,
                             onClick = { onSelectFeed(subscription.url) },
-                            onToggleFavorite = { onToggleFavorite(subscription.title) },
+                            onToggleFavorite = subscription.favoriteSource?.let { source ->
+                                { onToggleFavorite(source) }
+                            },
                         )
                     }
                 }

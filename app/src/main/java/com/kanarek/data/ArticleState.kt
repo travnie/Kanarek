@@ -7,6 +7,7 @@ internal data class SavedArticleRecord(
     val item: NewsItem,
     val savedAtMillis: Long,
     val offline: OfflineArticleContent? = null,
+    val feedUrl: String? = null,
 )
 
 internal object OfflineArticles {
@@ -154,7 +155,8 @@ internal object ArticleIdHistory {
 }
 
 internal object SavedArticleCodec {
-    private const val VERSION = "2"
+    private const val VERSION = "3"
+    private const val PREVIOUS_VERSION = "2"
     private const val LEGACY_VERSION = "1"
     private val encoder = Base64.getUrlEncoder().withoutPadding()
     private val decoder = Base64.getUrlDecoder()
@@ -183,6 +185,7 @@ internal object SavedArticleCodec {
             encodeText(record.offline?.imageUrl.orEmpty()),
             encodeText(record.offline?.content.orEmpty()),
             record.offline?.wordCount?.toString().orEmpty(),
+            encodeText(record.feedUrl.orEmpty()),
         ).joinToString("|")
 
     fun decode(record: String): NewsItem? = decodeRecord(record)?.item
@@ -190,7 +193,8 @@ internal object SavedArticleCodec {
     fun decodeRecord(record: String): SavedArticleRecord? =
         runCatching {
             when {
-                record.startsWith("$VERSION|") -> decodeCurrent(record)
+                record.startsWith("$VERSION|") || record.startsWith("$PREVIOUS_VERSION|") ->
+                    decodeCurrent(record)
                 record.startsWith("$LEGACY_VERSION|") -> decodeLegacy(record)
                 else -> null
             }
@@ -216,8 +220,10 @@ internal object SavedArticleCodec {
     fun offlineStorageBytes(offline: OfflineArticleContent): Long = offlineArticleStorageBytes(offline)
 
     private fun decodeCurrent(record: String): SavedArticleRecord? {
-        val fields = record.split('|', limit = 14)
-        if (fields.size != 14 || fields[0] != VERSION) return null
+        val fields = record.split('|', limit = 15)
+        if (fields[0] == VERSION && fields.size != 15) return null
+        if (fields[0] == PREVIOUS_VERSION && fields.size != 14) return null
+        if (fields[0] != VERSION && fields[0] != PREVIOUS_VERSION) return null
         val item =
             NewsItem(
                 title = decodeText(fields[2]),
@@ -249,6 +255,7 @@ internal object SavedArticleCodec {
             item = item,
             savedAtMillis = fields[1].toLongOrNull() ?: 0L,
             offline = offline,
+            feedUrl = fields.getOrNull(14)?.let(::decodeText)?.takeIf(String::isNotBlank),
         )
     }
 

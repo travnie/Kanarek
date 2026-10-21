@@ -1,9 +1,9 @@
 package com.kanarek.ui
 
 import com.kanarek.data.NewsItem
-import org.junit.Assert.assertEquals
-import org.junit.Assert.assertTrue
-import org.junit.Test
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
 class ReaderSubscriptionsTest {
     private fun item(title: String, source: String, link: String) =
@@ -19,6 +19,8 @@ class ReaderSubscriptionsTest {
         )))
         assertEquals(subscribed, options.map { it.url })
         assertEquals("Daily A", options[0].title)
+        assertEquals("Daily A", options[0].favoriteSource)
+        assertEquals(null, options[1].favoriteSource)
         assertEquals("b.test", options[1].title)
     }
 
@@ -30,16 +32,27 @@ class ReaderSubscriptionsTest {
         val indexed = mapOf(first to listOf(a), second to listOf(b))
         val options = readerSubscriptions(listOf(first, second), indexed)
         assertEquals(listOf("Same publisher", "Same publisher"), options.map { it.title })
-        assertEquals(listOf(a), readerSubscriptionItems(first, indexed, listOf(a, b)))
-        assertEquals(listOf(b), readerSubscriptionItems(second, indexed, listOf(a, b)))
-        assertEquals(listOf(a, b), readerSubscriptionItems(null, indexed, listOf(a, b)))
-        assertTrue(readerSubscriptionItems("https://unknown.test", indexed, listOf(a, b)).isEmpty())
+        assertEquals(listOf(first), readerActiveFeeds(listOf(first, second), first))
+        assertEquals(listOf(second), readerActiveFeeds(listOf(first, second), second))
+        assertEquals(listOf(first, second), readerActiveFeeds(listOf(first, second), null))
+        assertEquals(listOf(first, second), readerActiveFeeds(listOf(first, second), "unknown"))
+        assertEquals(first, options.first().url)
     }
 
     @Test fun onlySavedStoriesFromSelectedChannelRemain() {
         val a = item("A", "A", "https://example.com/a")
         val b = item("B", "B", "https://example.com/b")
-        assertEquals(listOf(a), savedArticlesFromSubscription(listOf(a, b), listOf(a)))
+        val mapping = mapOf(a.link to "feed-a", b.link to "feed-b")
+        assertEquals(
+            listOf(a),
+            savedArticlesFromSubscription(listOf(a, b), "feed-a", mapping, emptyMap()),
+        )
+        assertEquals(
+            listOf(a),
+            savedArticlesFromSubscription(listOf(a, b), "feed-a", emptyMap(), mapOf(
+                "feed-a" to listOf(a),
+            )),
+        )
     }
 
     @Test fun feedseekChannelsHaveDistinctLabelsBeforeFirstFetch() {
