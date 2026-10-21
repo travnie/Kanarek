@@ -42,6 +42,17 @@ class ReaderSubscriptionsTest {
         assertEquals(listOf(a), savedArticlesFromSubscription(listOf(a, b), listOf(a)))
     }
 
+    @Test fun feedseekChannelsHaveDistinctLabelsBeforeFirstFetch() {
+        val urls = listOf(
+            "https://raw.githubusercontent.com/trvny/feedseek/main/feeds/feed_pap.xml",
+            "https://raw.githubusercontent.com/trvny/feedseek/main/feeds/feed_reuters.xml",
+        )
+        assertEquals(
+            listOf("PAP", "REUTERS"),
+            readerSubscriptions(urls, emptyMap()).map { it.title },
+        )
+    }
+
     @Test fun duplicateFeedUrlsAreNotListedTwice() {
         val options = readerSubscriptions(
             listOf(" https://example.com/rss ", "https://example.com/rss", ""),

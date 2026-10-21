@@ -114,6 +114,12 @@ internal fun ReaderScreen(
             mutableStateOf(ReaderFilterState())
         }
 
+    // The old picker stored publisher-name filters. They are not subscription URLs;
+    // do not leave an invisible legacy source filter active after this upgrade.
+    LaunchedEffect(Unit) {
+        if (filters.sources.isNotEmpty()) filters = filters.copy(sources = emptySet())
+    }
+
     val headlinesMode by settings.headlinesMode.collectAsStateWithLifecycle(initialValue = false)
     val offlineSavedArticles by
         settings.offlineSavedArticles.collectAsStateWithLifecycle(initialValue = false)
