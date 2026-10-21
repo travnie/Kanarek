@@ -5,6 +5,7 @@ enum class ArticleListFilter { ALL, UNREAD, SAVED }
 data class ArticleState(
     val readIds: Set<String> = emptySet(),
     val savedArticles: List<NewsItem> = emptyList(),
+    val savedFeedByArticle: Map<String, String> = emptyMap(),
     val hiddenIds: Set<String> = emptySet(),
     val offlineArticles: Map<String, OfflineArticleContent> = emptyMap(),
 ) {

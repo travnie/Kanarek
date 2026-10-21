@@ -25,6 +25,25 @@ class ArticleStateTest {
     }
 
     @Test
+    fun savedFeedOwnershipSurvivesCodecAndVersionTwoStaysReadable() {
+        val record = SavedArticleRecord(
+            item = NewsItem(
+                title = "Old", link = "https://example.com/old", summary = "",
+                imageUrl = null, source = "News", publishedAtMillis = 12L,
+            ),
+            savedAtMillis = 31L,
+            feedUrl = "https://example.com/feed.xml",
+        )
+        val encoded = SavedArticleCodec.encodeRecord(record)
+        assertEquals(record, SavedArticleCodec.decodeRecord(encoded))
+        val versionTwoFields = encoded.split('|').dropLast(1).toMutableList()
+        versionTwoFields[0] = "2"
+        val legacyV2 = versionTwoFields.joinToString("|")
+        assertNull(SavedArticleCodec.decodeRecord(legacyV2)?.feedUrl)
+        assertEquals(record.item, SavedArticleCodec.decodeRecord(legacyV2)?.item)
+    }
+
+    @Test
     fun corruptSavedRecordsAreIgnored() {
         val valid = item(link = "https://example.com/valid")
 
