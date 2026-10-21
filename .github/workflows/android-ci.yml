@@ -85,6 +85,26 @@ jobs:
           path: app/build/outputs/apk/*/debug/*.apk
           if-no-files-found: warn
 
+      - name: Build side-by-side Kanarek Preview for PR testing
+        if: github.event_name == 'pull_request'
+        run: |
+          ./gradlew assemblePlayPreview --stacktrace
+          for apk in app/build/outputs/apk/play/preview/*.apk; do
+            test -s "$apk"
+            for bench in codebench docbench streambench; do
+              unzip -Z1 "$apk" | grep -Fx "assets/benches/$bench/portable.html" || exit 1
+            done
+          done
+
+      - name: Upload installable Kanarek Preview APK
+        if: github.event_name == 'pull_request'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: kanarek-preview-apk
+          path: app/build/outputs/apk/play/preview/*.apk
+          if-no-files-found: error
+          retention-days: 30
+
       - name: Upload JVM screenshots
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7

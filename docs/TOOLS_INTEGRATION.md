@@ -183,3 +183,19 @@ Implementation underway on `feat/scan-tile-actions`:
 - `shared/src/commonMain/kotlin/com/kanarek/data/M3uCodec.kt`: Kanarek subset
 - [twojstar Benches](https://github.com/travnie/twojstar/tree/main/benches)
 - [Kanarek architecture](ARCHITECTURE.md)
+
+## Testing the unmerged PR on Android
+
+The Android CI of this pull request publishes `kanarek-preview-apk` as a
+GitHub Actions artifact (Play variant). Download the ZIP from the successful
+**Android CI** run, extract `app-play-preview.apk`, and install it on the device.
+The preview's package ID is `com.kanarek.preview`, so it installs **beside**
+the signed `com.kanarek` release without uninstalling or overwriting its data.
+It has separate app data, accounts, widgets and playback state by design.
+The launcher label is **Kanarek Preview**.
+
+The ordinary `kanarek-debug-apk` artifact still uses `com.kanarek` and
+is **not** intended for installation over a signed release: their signing
+certificates differ. CI builds preview with the same staged, pinned Bench
+assets, never by downloading the release's mutable `latest` tag. Preview is
+debug-signed, not a production release. Actual phone QA is still required.
