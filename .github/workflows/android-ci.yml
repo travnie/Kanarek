@@ -151,6 +151,33 @@ jobs:
             for i in 1 2 3; do adb shell uiautomator dump /sdcard/player-ui.xml | grep -q dumped && break; sleep 3; done
             adb pull /sdcard/player-ui.xml out/player-ui.xml
             adb shell pidof com.kanarek
+            # Regression smoke: exercise bundled Docbench without connectivity.
+            # Gestures belong to its WebView, not the home pager.
+            adb shell am force-stop com.kanarek
+            adb shell svc wifi disable
+            adb shell svc data disable
+            adb shell am start -W -n com.kanarek/.HomeActivity --ei com.kanarek.extra.PAGE 2
+            sleep 5
+            for i in 1 2 3; do adb shell uiautomator dump /sdcard/tools-ui.xml | grep -q dumped && break; sleep 3; done
+            adb pull /sdcard/tools-ui.xml out/tools-ui.xml
+            python3 - <<'PY'
+            import re
+            import subprocess
+            import xml.etree.ElementTree as ET
+            nodes = ET.parse("out/tools-ui.xml").iter("node")
+            matches = [node for node in nodes if
+                       "Docbench" in (node.get("text", "") + " " + node.get("content-desc", ""))]
+            assert matches, "offline Tools hub did not expose Docbench"
+            numbers = list(map(int, re.findall(r"\d+", matches[0].get("bounds", ""))))
+            assert len(numbers) == 4, "Docbench target bounds missing"
+            x, y = (numbers[0] + numbers[2]) // 2, (numbers[1] + numbers[3]) // 2
+            subprocess.run(["adb", "shell", "input", "tap", str(x), str(y)], check=True)
+            PY
+            sleep 10
+            adb shell pidof com.kanarek
+            adb exec-out screencap -p > out/docbench-offline.png
+            for i in 1 2 3; do adb shell uiautomator dump /sdcard/docbench-ui.xml | grep -q dumped && break; sleep 3; done
+            adb pull /sdcard/docbench-ui.xml out/docbench-ui.xml
             adb logcat -d > out/logcat.txt || { sleep 3; adb logcat -d > out/logcat.txt; }
 
       - name: Check player deep-link and crashes
@@ -166,6 +193,11 @@ jobs:
           tops = [n for n in nodes if n.get("text") == "Radio & TV"
                   and int(re.findall(r"\d+", n.get("bounds"))[1]) < 400]
           assert tops, "player page not shown after cold-start deep-link"
+          doc_nodes = ET.parse("out/docbench-ui.xml").iter("node")
+          doc_headings = [n for n in doc_nodes if
+                          n.get("text") == "Docbench" and
+                          int(re.findall(r"\d+", n.get("bounds", "[0,0][0,0]"))[1]) < 400]
+          assert doc_headings, "bundled Docbench did not remain open offline"
           PY
 
       - name: Upload emulator screenshots
