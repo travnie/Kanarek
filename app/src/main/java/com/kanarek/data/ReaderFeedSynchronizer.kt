@@ -44,6 +44,14 @@ internal class ReaderFeedSynchronizer(
             limit = limit,
         )
 
+    /** Cached articles are indexed by subscribed feed URL, including feeds not in the top 15. */
+    fun cachedSubscriptionItems(feeds: List<String>): Map<String, List<NewsItem>> {
+        val snapshot = store.snapshot()
+        return feeds.normalizeFeedUrls().associateWith { feed ->
+            snapshot?.itemsByFeed?.get(feed).orEmpty()
+        }
+    }
+
     suspend fun refresh(
         config: ReaderFeedSyncConfig,
         limit: Int,

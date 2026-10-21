@@ -23,7 +23,6 @@ import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.BookmarkBorder
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Clear
-import androidx.compose.material.icons.filled.FilterList
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
@@ -101,11 +100,8 @@ internal fun ReaderTopBar(
                 }
             },
             actions = {
-                IconButton(onClick = onOpenSources) {
-                    Icon(
-                        Icons.Filled.FilterList,
-                        contentDescription = stringResource(R.string.reader_sources),
-                    )
+                TextButton(onClick = onOpenSources) {
+                    Text(stringResource(R.string.reader_channels_button))
                 }
                 IconButton(onClick = onRefresh) {
                     Icon(

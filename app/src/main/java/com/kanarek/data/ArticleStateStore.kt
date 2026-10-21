@@ -49,6 +49,9 @@ class ArticleStateStore(
                                 ),
                             ),
                         savedArticles = savedRecords.map(SavedArticleRecord::item),
+                        savedFeedByArticle = savedRecords.mapNotNull { record ->
+                            record.feedUrl?.let { ArticleStates.id(record.item) to it }
+                        }.toMap(),
                         hiddenIds =
                             ArticleIdHistory.ids(
                                 ArticleIdHistory.prune(
@@ -84,7 +87,7 @@ class ArticleStateStore(
         }
     }
 
-    suspend fun toggleSaved(item: NewsItem) {
+    suspend fun toggleSaved(item: NewsItem, feedUrl: String? = null) {
         val id = ArticleStates.id(item)
         if (id.isBlank()) return
         SAVED_MUTEX.withLock {
@@ -92,7 +95,7 @@ class ArticleStateStore(
             val records = currentSavedRecords().toMutableList()
             val matchingIndex = records.indexOfFirst { ArticleStates.id(it.item) == id }
             if (matchingIndex < 0) {
-                records += SavedArticleRecord(item = item, savedAtMillis = now)
+                records += SavedArticleRecord(item = item, savedAtMillis = now, feedUrl = feedUrl)
             } else {
                 records.removeAt(matchingIndex)
             }
