@@ -3,13 +3,13 @@ package com.kanarek.ui
 import com.kanarek.data.NewsItem
 
 /** Subscription identity is always the saved feed URL, not a name from an article. */
-internal data class ReaderSubscription(
+data class ReaderSubscription(
     val url: String,
     val title: String,
     val favoriteSource: String? = null,
 )
 
-internal fun readerSubscriptions(
+fun readerSubscriptions(
     savedFeeds: List<String>,
     itemsByFeed: Map<String, List<NewsItem>>,
 ): List<ReaderSubscription> =
@@ -32,14 +32,14 @@ internal fun readerSubscriptions(
         }
 
 /** This exact feed list is passed to the synchronizer; UI and tests share one rule. */
-internal fun readerActiveFeeds(
+fun readerActiveFeeds(
     savedFeeds: List<String>,
     selectedFeedUrl: String?,
 ): List<String> =
     selectedFeedUrl?.takeIf(savedFeeds::contains)?.let(::listOf) ?: savedFeeds
 
 /** Persisted channel ownership survives the preview and feed-cache retention limits. */
-internal fun savedArticlesFromSubscription(
+fun savedArticlesFromSubscription(
     savedArticles: List<NewsItem>,
     selectedFeedUrl: String,
     savedFeedByArticle: Map<String, String>,
