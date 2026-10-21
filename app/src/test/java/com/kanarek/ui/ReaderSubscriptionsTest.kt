@@ -7,7 +7,10 @@ import org.junit.Test
 
 class ReaderSubscriptionsTest {
     private fun item(title: String, source: String, link: String) =
-        NewsItem(title = title, link = link, source = source, summary = "", imageUrl = null)
+        NewsItem(
+            title = title, link = link, source = source, summary = "",
+            imageUrl = null, publishedAtMillis = null,
+        )
 
     @Test fun subscriptionsComeFromConfiguredUrlsEvenWhenFeedHasNoStories() {
         val subscribed = listOf("https://a.test/rss", "https://b.test/feed")
