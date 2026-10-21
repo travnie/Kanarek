@@ -147,6 +147,10 @@ class HomeActivity : ComponentActivity() {
 
 private const val PAGE_COUNT = 3
 
+// Embedded WebViews need to own both horizontal and vertical drag gestures.
+// Page switching stays available through the bottom navigation and drawer.
+internal fun homePagerSwipeEnabled(page: Int): Boolean = page != HomeActivity.PAGE_TOOLS
+
 @Composable
 private fun HomeShell(
     settings: SettingsStore,
@@ -279,6 +283,7 @@ private fun HomeShell(
         ) { padding ->
             HorizontalPager(
                 state = pagerState,
+                userScrollEnabled = homePagerSwipeEnabled(pagerState.currentPage),
                 // Keep the neighbour page alive so the player's service binding (and the
                 // reader's loaded stories) survive swiping away and back.
                 beyondViewportPageCount = 1,

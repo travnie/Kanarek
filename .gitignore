@@ -14,3 +14,6 @@ megalinter-reports/
 
 # Claude Code: cloud hooks/settings live in the environment setup script; local .claude/ is per-machine
 .claude/
+
+# Built from pinned twojstar sources, not maintained here.
+app/src/main/assets/benches/
