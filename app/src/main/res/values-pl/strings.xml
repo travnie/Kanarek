@@ -94,6 +94,14 @@
     <string name="tools_offline_badge">Offline</string>
     <string name="tools_switch_online">Online</string>
     <string name="tools_switch_offline">Offline</string>
+    <string name="tools_mode_offline">Tryb: offline</string>
+    <string name="tools_mode_online">Tryb: online</string>
+    <string name="tools_mode_confirmation_title">Zmienić tryb Bencha?</string>
+    <string name="tools_mode_confirmation_text">Przełączenie ponownie wczyta narzędzie i usunie niezapisane zmiany. Najpierw zapisz lub wyeksportuj wyniki.</string>
+    <string name="tools_mode_confirmation_accept">Przełącz</string>
+    <string name="tools_online_notice_title">Tryb online niedostępny</string>
+    <string name="tools_online_unavailable">Brak działającego połączenia z internetem. Pozostajesz w lokalnym Benchu.</string>
+    <string name="tools_online_load_failed">Nie udało się wczytać wersji online. Przywrócono wersję offline.</string>
     <string name="open_with_offline_privacy">Wybierz warsztat. Wbudowane narzędzia przetwarzają plik na urządzeniu, a pozostałe korzystają z wersji online. Funkcje internetowe Streambencha łączą się z jego backendem. Limit importu: 4 MB.</string>
     <string name="tools_open">Otwórz</string>
     <string name="tools_back">Wróć do narzędzi</string>

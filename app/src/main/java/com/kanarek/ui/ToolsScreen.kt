@@ -1,6 +1,9 @@
 package com.kanarek.ui
 
 import android.app.Activity
+import android.content.Context
+import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
 import android.Manifest
 import android.graphics.Bitmap
 import android.content.Intent
@@ -9,6 +12,7 @@ import android.net.Uri
 import org.json.JSONObject
 import android.webkit.CookieManager
 import android.webkit.PermissionRequest
+import android.webkit.WebResourceError
 import android.webkit.ValueCallback
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceRequest
@@ -25,6 +29,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
@@ -77,6 +82,7 @@ import com.kanarek.data.ScanPayload
 import com.kanarek.data.ScanPayloadParser
 import com.kanarek.R
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -106,6 +112,18 @@ private val codeScanObserver = """
   } else install();
 })();
 """.trimIndent()
+
+// Do not destroy the bundled editor for a hosted page that cannot be reached.
+internal fun hasHostedConnection(capabilities: NetworkCapabilities?): Boolean =
+    capabilities?.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) == true &&
+        capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)
+
+private fun hasHostedConnection(context: Context): Boolean = runCatching {
+    val manager = context.getSystemService(Context.CONNECTIVITY_SERVICE)
+        as? ConnectivityManager ?: return@runCatching false
+    val network = manager.activeNetwork ?: return@runCatching false
+    hasHostedConnection(manager.getNetworkCapabilities(network))
+}.getOrDefault(false)
 
 private fun isTrustedOrigin(target: Uri, trusted: Uri): Boolean =
     target.scheme == "https" &&
@@ -148,7 +166,21 @@ internal fun ToolsScreen(
     var processingFileId by remember { mutableStateOf<Long?>(null) }
     var selectedKey by rememberSaveable { mutableStateOf<String?>(null) }
     var useHosted by rememberSaveable { mutableStateOf(false) }
+    var hostedLoading by remember { mutableStateOf(false) }
+    var modeNotice by remember { mutableStateOf<Int?>(null) }
+    var showSwitchConfirmation by remember { mutableStateOf(false) }
     val selected = Bench.entries.firstOrNull { it.name == selectedKey }
+    LaunchedEffect(useHosted, hostedLoading, selected, isActive) {
+        if (isActive && selected != null && useHosted && hostedLoading) {
+            delay(15_000)
+            if (useHosted && hostedLoading) {
+                // A stalled hosted WebView must not strand the user on a blank page.
+                hostedLoading = false
+                useHosted = false
+                modeNotice = R.string.tools_online_load_failed
+            }
+        }
+    }
     var scanned by remember { mutableStateOf<ScanPayload?>(null) }
     LaunchedEffect(pendingScanRequest, inboundFile?.id, processingFileId) {
         // A file import in progress owns the page until it is delivered.
@@ -178,12 +210,26 @@ internal fun ToolsScreen(
                     if (selected != null && bundledBenches[selected] == true) {
                         TextButton(
                             enabled = !openingFile && preparedFile == null,
-                            onClick = { useHosted = !useHosted },
+                            onClick = {
+                                if (!useHosted && !hasHostedConnection(context)) {
+                                    modeNotice = R.string.tools_online_unavailable
+                                } else {
+                                    showSwitchConfirmation = true
+                                }
+                            },
                         ) {
-                            Text(stringResource(
-                                if (useHosted) R.string.tools_switch_offline
-                                else R.string.tools_switch_online,
-                            ))
+                            if (useHosted && hostedLoading) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(18.dp),
+                                    strokeWidth = 2.dp,
+                                )
+                            } else {
+                                // Show the CURRENT mode, not the next action.
+                                Text(stringResource(
+                                    if (useHosted) R.string.tools_mode_online
+                                    else R.string.tools_mode_offline,
+                                ))
+                            }
                         }
                     }
                 },
@@ -220,6 +266,8 @@ internal fun ToolsScreen(
                         onClick = {
                             preparedFile = null
                             useHosted = false
+                            hostedLoading = false
+                            modeNotice = null
                             selectedKey = bench.name
                         },
                         modifier = Modifier.fillMaxWidth(),
@@ -251,8 +299,17 @@ internal fun ToolsScreen(
                     processingFileId = null
                     selectedKey = null
                     useHosted = false
+                    hostedLoading = false
                 },
                 onScan = { scanned = it },
+                onHostedLoaded = { if (useHosted) hostedLoading = false },
+                onHostedFailed = {
+                    if (useHosted) {
+                        hostedLoading = false
+                        useHosted = false
+                        modeNotice = R.string.tools_online_load_failed
+                    }
+                },
                 incomingFile = preparedFile?.takeIf { it.target.name == benchKey(selected) },
                 onFileImported = { imported ->
                     preparedFile?.let { onFileHandled(it.id) }
@@ -262,6 +319,42 @@ internal fun ToolsScreen(
                 },
             )
         }
+    }
+    if (showSwitchConfirmation && selected != null) {
+        AlertDialog(
+            onDismissRequest = { showSwitchConfirmation = false },
+            title = { Text(stringResource(R.string.tools_mode_confirmation_title)) },
+            text = { Text(stringResource(R.string.tools_mode_confirmation_text)) },
+            confirmButton = {
+                TextButton(onClick = {
+                    showSwitchConfirmation = false
+                    if (!useHosted && !hasHostedConnection(context)) {
+                        modeNotice = R.string.tools_online_unavailable
+                    } else {
+                        val nextHosted = !useHosted
+                        hostedLoading = nextHosted
+                        useHosted = nextHosted
+                    }
+                }) { Text(stringResource(R.string.tools_mode_confirmation_accept)) }
+            },
+            dismissButton = {
+                TextButton(onClick = { showSwitchConfirmation = false }) {
+                    Text(stringResource(R.string.open_with_cancel))
+                }
+            },
+        )
+    }
+    modeNotice?.let { message ->
+        AlertDialog(
+            onDismissRequest = { modeNotice = null },
+            title = { Text(stringResource(R.string.tools_online_notice_title)) },
+            text = { Text(stringResource(message)) },
+            confirmButton = {
+                TextButton(onClick = { modeNotice = null }) {
+                    Text(stringResource(R.string.close))
+                }
+            },
+        )
     }
     if (isActive) {
         inboundFile?.takeIf { it.id != processingFileId }?.let { source ->
@@ -357,6 +450,8 @@ private fun BenchWebView(
     modifier: Modifier = Modifier,
     onExit: () -> Unit,
     onScan: (ScanPayload) -> Unit,
+    onHostedLoaded: () -> Unit,
+    onHostedFailed: () -> Unit,
     incomingFile: PreparedBenchFile?,
     onFileImported: (Boolean) -> Unit,
 ) {
@@ -561,6 +656,32 @@ private fun BenchWebView(
             }
 
             webViewClient = object : WebViewClient() {
+                private var mainFrameFailed = false
+
+                override fun onReceivedError(
+                    view: WebView?,
+                    request: WebResourceRequest?,
+                    error: WebResourceError?,
+                ) {
+                    if (!offline && request?.isForMainFrame == true) {
+                        mainFrameFailed = true
+                        view?.post(onHostedFailed)
+                    }
+                }
+
+                override fun onReceivedHttpError(
+                    view: WebView?,
+                    request: WebResourceRequest?,
+                    errorResponse: WebResourceResponse?,
+                ) {
+                    if (!offline && request?.isForMainFrame == true &&
+                        (errorResponse?.statusCode ?: 0) >= 400
+                    ) {
+                        mainFrameFailed = true
+                        view?.post(onHostedFailed)
+                    }
+                }
+
                 override fun shouldInterceptRequest(
                     view: WebView?, request: WebResourceRequest?,
                 ): WebResourceResponse? =
@@ -578,6 +699,9 @@ private fun BenchWebView(
                 }
 
                 override fun onPageFinished(view: WebView?, url: String?) {
+                    if (!offline && !mainFrameFailed &&
+                        url?.let { trustedPage(Uri.parse(it)) } == true
+                    ) onHostedLoaded()
                     if (offline && url?.let { trustedPage(Uri.parse(it)) } == true &&
                         WebViewFeature.isFeatureSupported(WebViewFeature.WEB_MESSAGE_LISTENER) &&
                         !WebViewFeature.isFeatureSupported(WebViewFeature.DOCUMENT_START_SCRIPT)
@@ -598,6 +722,7 @@ private fun BenchWebView(
 
                 // shouldOverrideUrlLoading is not called for POST navigation.
                 override fun onPageStarted(view: WebView?, url: String?, favicon: Bitmap?) {
+                    mainFrameFailed = false
                     val target = url?.let(Uri::parse)
                     if (target == null || !trustedPage(target)) view?.stopLoading()
                 }

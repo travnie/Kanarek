@@ -94,6 +94,14 @@
     <string name="tools_offline_badge">Offline</string>
     <string name="tools_switch_online">Online</string>
     <string name="tools_switch_offline">Offline</string>
+    <string name="tools_mode_offline">Mode: offline</string>
+    <string name="tools_mode_online">Mode: online</string>
+    <string name="tools_mode_confirmation_title">Switch Bench mode?</string>
+    <string name="tools_mode_confirmation_text">Switching reloads this tool and discards unsaved changes. Export or save your work first.</string>
+    <string name="tools_mode_confirmation_accept">Switch</string>
+    <string name="tools_online_notice_title">Online mode unavailable</string>
+    <string name="tools_online_unavailable">There is no working internet connection. Your offline Bench remains open.</string>
+    <string name="tools_online_load_failed">The hosted Bench could not load in time. Returned to the offline version.</string>
     <string name="tools_open">Open</string>
     <string name="tools_back">Back to tools</string>
     <string name="settings">Settings</string>
