@@ -31,24 +31,50 @@ replace Streambench's allowlisted relay with an unrestricted proxy.
 
 ## Delivery slices
 
+**Offline Benches (GitHub APK slice):** `stage-benches.sh` produces the
+single-file Codebench, Docbench and Streambench portable assets from one pinned
+twojstar source commit. Each Bench is served from its own HTTPS app origin via
+`WebViewAssetLoader`; no external service is required for its bundled tools.
+The user's optional Online toggle opens the existing hosted Bench, while
+Streambench's provider/relay API still needs a network connection. Builds
+without staged assets fall back to their hosted counterparts.
+
+User-requested Blob exports open Android `ACTION_CREATE_DOCUMENT` (32 MiB
+limit); importing external files remains limited to 4 MiB in the preview.
+Android permission is scoped to the selected document, not broad storage.
+Offline camera/file import uses the existing guarded WebView interface.
+Real-device QR/PDF/playlist verification remains outstanding.
+
+To stage locally, install Node 24, git and npm, then run:
+
+```sh
+bash .github/scripts/stage-benches.sh
+```
+
+Generated assets under `app/src/main/assets/benches/` are ignored.
+The build revision and expected hashes live in the one staging script;
+the maintained Bench source remains exclusively in twojstar.
+
 ### 1. Native Tools hub (initial PR)
 
 - Add a third Compose destination reachable via the existing pager, bottom bar
   and drawer; keep reader/player navigation and MediaSession lifetime intact.
-- Open each existing **hosted** Bench inside an isolated WebView on selection.
+- Open each Bench in its bundled WebView when present, with hosted preview fallback.
   Enable Android camera permission for trusted Codebench origin and OS file
   picking for user-selected inputs. No JavaScript interface or broad storage
   permission. Block mixed content and external in-WebView navigation.
-- Hosted mode is a transitional preview: it requires a network connection;
+- Hosted mode requires a network connection;
   browser downloads and all workflows are not yet guaranteed inside WebView.
   Switching away unloads the preview, including unsaved in-memory edits, to
   stop hidden camera/media activity. Save or export first; this tradeoff can be
   revisited when bundled sandboxes and native file state are implemented.
-  Do not describe it as offline-capable or native-export-complete.
+  Do not describe hosted mode as offline-capable or native-export-complete.
 - Build both `play` and `foss` variants, exercise navigation/back, picker,
   scanner permissions and offline reader/player regression checks.
 
 ### 2. Bundled portable web assets
+
+- All three portable assets are staged in the GitHub APK pipelines, selected per Bench only when present.
 
 - Reuse each Bench's existing `public/portable.html` build; maintain one
   source of truth in twojstar. Pin a source revision/artifact manifest in
@@ -157,3 +183,19 @@ Implementation underway on `feat/scan-tile-actions`:
 - `shared/src/commonMain/kotlin/com/kanarek/data/M3uCodec.kt`: Kanarek subset
 - [twojstar Benches](https://github.com/travnie/twojstar/tree/main/benches)
 - [Kanarek architecture](ARCHITECTURE.md)
+
+## Testing the unmerged PR on Android
+
+The Android CI of this pull request publishes `kanarek-preview-apk` as a
+GitHub Actions artifact (Play variant). Download the ZIP from the successful
+**Android CI** run, extract `app-play-preview.apk`, and install it on the device.
+The preview's package ID is `com.kanarek.preview`, so it installs **beside**
+the signed `com.kanarek` release without uninstalling or overwriting its data.
+It has separate app data, accounts, widgets and playback state by design.
+The launcher label is **Kanarek Preview**.
+
+The ordinary `kanarek-debug-apk` artifact still uses `com.kanarek` and
+is **not** intended for installation over a signed release: their signing
+certificates differ. CI builds preview with the same staged, pinned Bench
+assets, never by downloading the release's mutable `latest` tag. Preview is
+debug-signed, not a production release. Actual phone QA is still required.

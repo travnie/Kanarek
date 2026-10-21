@@ -28,6 +28,14 @@ jobs:
           distribution: temurin
           java-version: "17"
 
+      - name: Set up Node.js for bundled Benches
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
+        with:
+          node-version: "24"
+
+      - name: Stage offline Benches from pinned source
+        run: bash .github/scripts/stage-benches.sh
+
       - name: Read the Gradle version from the wrapper properties
         id: gradle
         run: .github/scripts/gradle-version.sh
@@ -62,12 +70,40 @@ jobs:
           ./gradlew assemblePlayDebug assembleFossDebug testPlayDebugUnitTest \
             :shared:testAndroidHostTest lintPlayDebug -Proborazzi.test.record=true --stacktrace
 
+      - name: Verify portable Benches are in both APK flavors
+        run: |
+          for apk in app/build/outputs/apk/{play,foss}/debug/*.apk; do
+            for bench in codebench docbench streambench; do
+              unzip -Z1 "$apk" | grep -Fx "assets/benches/$bench/portable.html" || exit 1
+            done
+          done
+
       - name: Upload debug APK
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: kanarek-debug-apk
           path: app/build/outputs/apk/*/debug/*.apk
           if-no-files-found: warn
+
+      - name: Build side-by-side Kanarek Preview for PR testing
+        if: github.event_name == 'pull_request'
+        run: |
+          ./gradlew assemblePlayPreview --stacktrace
+          for apk in app/build/outputs/apk/play/preview/*.apk; do
+            test -s "$apk"
+            for bench in codebench docbench streambench; do
+              unzip -Z1 "$apk" | grep -Fx "assets/benches/$bench/portable.html" || exit 1
+            done
+          done
+
+      - name: Upload installable Kanarek Preview APK
+        if: github.event_name == 'pull_request'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: kanarek-preview-apk
+          path: app/build/outputs/apk/play/preview/*.apk
+          if-no-files-found: error
+          retention-days: 30
 
       - name: Upload JVM screenshots
         if: always()
@@ -89,6 +125,9 @@ jobs:
     permissions:
       contents: read
     steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: kanarek-debug-apk
@@ -115,6 +154,22 @@ jobs:
             for i in 1 2 3; do adb shell uiautomator dump /sdcard/player-ui.xml | grep -q dumped && break; sleep 3; done
             adb pull /sdcard/player-ui.xml out/player-ui.xml
             adb shell pidof com.kanarek
+            # Regression smoke: exercise bundled Docbench without connectivity.
+            # Gestures belong to its WebView, not the home pager.
+            adb shell am force-stop com.kanarek
+            adb shell svc wifi disable
+            adb shell svc data disable
+            adb shell am start -W -n com.kanarek/.HomeActivity --ei com.kanarek.extra.PAGE 2
+            sleep 5
+            for i in 1 2 3; do adb shell uiautomator dump /sdcard/tools-ui.xml | grep -q dumped && break; sleep 3; done
+            adb pull /sdcard/tools-ui.xml out/tools-ui.xml
+            # The emulator action executes each script line separately.
+            python3 .github/scripts/tap-docbench.py out/tools-ui.xml
+            sleep 10
+            adb shell pidof com.kanarek
+            adb exec-out screencap -p > out/docbench-offline.png
+            for i in 1 2 3; do adb shell uiautomator dump /sdcard/docbench-ui.xml | grep -q dumped && break; sleep 3; done
+            adb pull /sdcard/docbench-ui.xml out/docbench-ui.xml
             adb logcat -d > out/logcat.txt || { sleep 3; adb logcat -d > out/logcat.txt; }
 
       - name: Check player deep-link and crashes
@@ -130,6 +185,11 @@ jobs:
           tops = [n for n in nodes if n.get("text") == "Radio & TV"
                   and int(re.findall(r"\d+", n.get("bounds"))[1]) < 400]
           assert tops, "player page not shown after cold-start deep-link"
+          doc_nodes = ET.parse("out/docbench-ui.xml").iter("node")
+          doc_headings = [n for n in doc_nodes if
+                          n.get("text") == "Docbench" and
+                          int(re.findall(r"\d+", n.get("bounds", "[0,0][0,0]"))[1]) < 400]
+          assert doc_headings, "bundled Docbench did not remain open offline"
           PY
 
       - name: Upload emulator screenshots

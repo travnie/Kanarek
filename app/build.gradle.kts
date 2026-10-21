@@ -34,6 +34,13 @@ android {
     }
 
     buildTypes {
+        // Side-by-side, debug-signed PR test APK. Does not replace com.kanarek.
+        create("preview") {
+            initWith(getByName("debug"))
+            applicationIdSuffix = ".preview"
+            versionNameSuffix = "-preview"
+            matchingFallbacks += listOf("debug")
+        }
         release {
             isMinifyEnabled = true
             isShrinkResources = true
