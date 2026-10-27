@@ -17,3 +17,23 @@ megalinter-reports/
 
 # Built from pinned twojstar sources, not maintained here.
 app/src/main/assets/benches/
+
+# Local tooling / agent state
+.kotlin/
+*.aab
+*.jks
+# Workers
+.wrangler/
+worker-configuration.d.ts
+*.tsbuildinfo
+# Python helpers
+__pycache__/
+*.py[cod]
+.venv/
+# Local env
+.env
+.env.*
+!.env.example
+.dev.vars
+*.log
+CLAUDE.local.md
