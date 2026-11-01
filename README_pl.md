@@ -1,5 +1,7 @@
 **Polski** · [English](README.md) · [简体中文](README_zh.md)
 
+> Feature details and integration docs are maintained in the [English README](README.md).
+
 <div align="center">
 
 <img src="assets/kanarek.svg" alt="Kanarek" width="96">
