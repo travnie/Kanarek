@@ -17,10 +17,11 @@
 
 </div>
 
-Kanarek combines two tools in one native application:
+Kanarek brings three surfaces into one native Android app:
 
-- an RSS/Atom reader with an auto-rotating home-screen news widget,
-- a background internet radio and IPTV player with its own transport-control widget.
+- **News:** RSS/Atom reader, offline articles, notifications and a home-screen slideshow widget.
+- **Radio & TV:** background streaming, playlists, Cast and a player widget.
+- **Tools:** Codebench, Docbench and Streambench for QR codes, documents and playlists, with bundled offline web tools in CI-built APKs.
 
 An optional Cloudflare Worker accelerates fetching and provides additional network features. It is not required: ordinary RSS/Atom feeds can be parsed directly on the device.
 
@@ -36,6 +37,12 @@ An optional Cloudflare Worker accelerates fetching and provides additional netwo
 - optional new-story notifications with quiet hours,
 - last-known-good stories stay visible when an individual source temporarily fails.
 
+### Reader data and recovery
+
+- storage screen with feed/image cache sizes and manual cleanup,
+- per-article read/hidden/saved history with optional offline content,
+- portable backup and restore for reader settings, feeds, stations and saved state.
+
 ### Radio and IPTV
 
 - background Media3/ExoPlayer playback with system media controls,
@@ -45,6 +52,16 @@ An optional Cloudflare Worker accelerates fetching and provides additional netwo
 - missing channel logos filled through iptv-org and favicon fallbacks,
 - playlist-provided `User-Agent` and `Referer` support,
 - Google Cast in the `play` flavor; the `foss` flavor is Google-services-free.
+
+### Tools and Benches
+
+- **Codebench:** QR/barcode creation and scanning, including a Quick Settings scan tile and confirmation before external actions.
+- **Docbench:** edit, convert and export supported documents and text files.
+- **Streambench:** inspect playlists, XMLTV and stream diagnostics without replacing Kanarek's player or station store.
+- Three pinned portable Bench builds ship inside CI release/preview APKs and open via isolated HTTPS-like WebView asset origins. Each Bench also offers an optional hosted mode for network-dependent features.
+- Open supported files from Android's **Open with** or **Share** flow, choose the destination Bench, and export results using the system document picker. Native imports are bounded and read-only; the original file is not overwritten.
+
+Offline availability applies to bundled tools, not remote streams, online providers or hosted mode. See [Tools integration](docs/TOOLS_INTEGRATION.md) for limitations and trust boundaries.
 
 ## Install
 
@@ -58,19 +75,20 @@ The minimum supported system is Android 8.0 (API 26).
 ## Quick start
 
 1. Install the preferred APK flavor.
-2. Open Kanarek and choose **News** or **Radio & TV**.
+2. Open Kanarek and choose **News**, **Radio & TV**, or **Tools**.
 3. Add RSS/Atom sources or import an OPML file.
 4. Add stations manually, search the radio directory, or import an M3U/M3U8 playlist.
-5. Long-press the Android home screen, open **Widgets**, and add either Kanarek widget.
+5. Open **Tools** to use a Bench, or share a supported file to Kanarek; add the **Scan** Quick Settings tile for QR scanning.
+6. Long-press the Android home screen, open **Widgets**, and add a Kanarek news or player widget.
 
 The Backend URL may remain blank: regular feed refreshes stay on-device, while feed discovery, station search, and logo lookup can use Kanarek's built-in default service. Set your own Worker URL only when you want normal feed refreshes routed through that Worker or operator-controlled features such as clean-reader extraction and synchronized state.
 
 ## Documentation
 
-- [Tools and Bench integration roadmap](docs/TOOLS_INTEGRATION.md)
-- [Architecture](docs/ARCHITECTURE.md)
-- [Build, tests, and CI](docs/DEVELOPMENT.md)
-- [Cloudflare Worker and API](docs/WORKER.md)
+- [Tools, Benches and file sharing](docs/TOOLS_INTEGRATION.md)
+- [Architecture and integration boundaries](docs/ARCHITECTURE.md)
+- [Development, tests and releases](docs/DEVELOPMENT.md)
+- [Cloudflare Worker API](docs/WORKER.md)
 - [Project history](docs/HISTORY.md)
 - [F-Droid submission notes](docs/FDROID.md)
 
@@ -86,6 +104,8 @@ GRADLE_VERSION=$(sed -n 's#^distributionUrl=.*/gradle-\([0-9][A-Za-z0-9.-]*\)-\(
 command -v gradle >/dev/null || { echo "Install Gradle $GRADLE_VERSION first" >&2; exit 1; }
 gradle --version | grep -F "Gradle $GRADLE_VERSION" >/dev/null || { echo "Use Gradle $GRADLE_VERSION to bootstrap the wrapper" >&2; exit 1; }
 gradle wrapper --gradle-version "$GRADLE_VERSION" --no-daemon
+# For an offline-Bench APK, stage the pinned assets first (Node 24 + npm + git).
+# bash .github/scripts/stage-benches.sh
 ./gradlew assembleDebug
 ./gradlew testPlayDebugUnitTest
 ```

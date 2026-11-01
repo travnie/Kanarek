@@ -25,10 +25,12 @@ Cast receivers fetch media independently, so local per-stream request headers do
 
 ### UI and storage
 
-- one-window `HomeActivity` with reader/player pages,
+- one-window `HomeActivity` with News, Radio & TV, and Tools pages,
 - source search and grouped station browsing,
 - dedicated Memory & Data controls for cache and reader state,
-- launcher-safe `RemoteViews` widgets with Robolectric inflation coverage.
+- launcher-safe `RemoteViews` widgets with Robolectric inflation coverage,
+- portable backup/restore of reader and player data,
+- offline Codebench/Docbench/Streambench tools, Android file sharing/export and a Quick Settings QR scan tile.
 
 ### Backend and portability
 
@@ -62,7 +64,6 @@ Kanarek's on-demand `/scrape` path and Feedseek's generated feeds solve related 
 - [Architecture](ARCHITECTURE.md)
 - [Worker and API](WORKER.md)
 - [Development and releases](DEVELOPMENT.md)
-- [Integrations](INTEGRATIONS.md)
-- [Known concerns](CONCERNS.md)
+- [Tools and Benches](TOOLS_INTEGRATION.md)
 
 Build/toolchain versions live in repository configuration, not in this history file.

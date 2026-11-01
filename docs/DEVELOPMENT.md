@@ -1,101 +1,60 @@
-# Kanarek development
+# Development
 
-## Requirements
+## Requirements and build
 
-- Android Studio or command-line Android SDK
-- JDK 17
-- the Gradle version declared in `gradle/wrapper/gradle-wrapper.properties`
-- Node.js and npm for the Worker
+Use JDK 17, Android SDK, the **exact** Gradle version in `gradle/wrapper/gradle-wrapper.properties`, and Node.js/npm for the Worker. Dependency pins live in `gradle/libs.versions.toml`, `worker/package.json` and their lock/config files, not here.
 
-Dependency versions live in `gradle/libs.versions.toml`.
+The repository does **not** commit `gradlew` or the wrapper JAR. On a new clone, install the declared Gradle version and generate the wrapper:
 
-The Gradle wrapper JAR and scripts are not committed. On a fresh clone, follow the bootstrap in `.github/workflows/android-ci.yml`: read the required version from `gradle/wrapper/gradle-wrapper.properties`, install/use that exact Gradle version, then run its `wrapper` task. Do not rely on an older system Gradle to configure the project.
-
-## Build and install
-
-Run Android commands from the repository root:
-
-```bash
-./gradlew assembleDebug
-./gradlew installPlayDebug
+```sh
+GRADLE_VERSION=$(sed -n 's#^distributionUrl=.*/gradle-\([0-9][A-Za-z0-9.-]*\)-\(bin\|all\)\.zip$#\1#p' gradle/wrapper/gradle-wrapper.properties)
+gradle --version
+gradle wrapper --gradle-version "$GRADLE_VERSION" --no-daemon
+./gradlew assemblePlayDebug assembleFossDebug
 ```
 
-`assembleDebug` builds both product flavors:
+`play` includes Google Cast; `foss` excludes GMS and is the F-Droid-compatible flavor. `app/build.gradle.kts` owns version names, SDK levels and package IDs.
 
-- `play`: includes the proprietary Google Cast sender SDK,
-- `foss`: GMS-free and suitable for F-Droid builds.
+### Bundled Benches
 
-Flavor-specific commands include:
+CI release and preview APKs include pinned portable Bench assets. For equivalent local builds, install **Node 24**, npm and git, then run this **before** assembling:
 
-```bash
+```sh
+bash .github/scripts/stage-benches.sh
 ./gradlew assemblePlayDebug
-./gradlew assembleFossDebug
-./gradlew assembleFossRelease
 ```
 
-After installation, long-press the Android home screen, open **Widgets**, and add either the Kanarek news widget or the radio/TV player widget.
+The script fetches a specific commit from `travnie/twojstar`, builds all three portable pages and checks hashes. Generated `app/src/main/assets/benches/` files are ignored. Builds made without staging can open the hosted Benches but must not be described as offline-equipped.
 
 ## Tests
 
-App logic and widget inflation:
-
-```bash
-./gradlew testPlayDebugUnitTest
+```sh
+./gradlew testPlayDebugUnitTest :shared:testAndroidHostTest lintPlayDebug
+./gradlew assemblePlayDebug assembleFossDebug
+# macOS with Xcode:
+./gradlew :shared:iosSimulatorArm64Test
+# Worker:
+cd worker && npm ci && npm run typecheck && npm test
 ```
 
-Worker typecheck and tests:
+- `shared/commonTest`: parsers, OPML/M3U codecs, state and portable UI models.
+- `app/src/test`: Android orchestration, backups, scanner/security cases, player state and Robolectric widget `RemoteViews`.
+- `worker/test`: parser, ETag, discovery, station and state helpers. Vitest uses Node, not a simulated Cloudflare runtime.
+- There is no general Android instrumentation suite. Validate native file picker, camera, Bench exports, launcher widgets and Cast on devices before claiming those flows fully verified.
 
-```bash
-cd worker
-npm ci
-npm run typecheck
-npm test
-```
+## CI and release
 
-The JVM suite covers feed parsing, entity decoding, image precedence, date normalization, OPML round-trips, headline ranking, M3U/M3U8 parsing, per-stream headers, favicon fallback, and widget RemoteViews inflation.
+- `android-ci.yml`: staged Benches, both APK flavors, tests/lint and preview/debug artifacts.
+- `kmp-ios-ci.yml`: iOS simulator tests for the shared library, not an iOS application.
+- `worker-ci.yml`: typecheck, Vitest and default-feed sync check; **does not deploy**.
+- `release.yml`: rolling signed Play/FOSS APKs for relevant `main` changes, with pinned Bench asset verification.
+- Production Worker deployment belongs solely to **Cloudflare Workers Builds** on `worker/` changes.
+- GitHub Dependabot, CodeQL and MegaLinter provide additional checks. Triage dependency alerts against actual runtime reachability; build-tooling-only advisories are not automatically application vulnerabilities.
 
-The Worker suite covers feed parsing, conditional ETags, output formats, Radio Browser mapping, iptv-org logo selection, discovery/scraping, and state-related helpers.
+Use `.github/scripts/sync-default-feeds.mjs` and its CI check for changes to bundled feed defaults. Do not modify generated results independently.
 
-## Continuous integration
+Release signing requires external `KEYSTORE_BASE64`, `KEYSTORE_PASSWORD`, `KEY_ALIAS` and `KEY_PASSWORD` secrets. For tagged releases update `versionCode` / `versionName` in `app/build.gradle.kts` and use a matching `v<versionName>` tag; the rolling `kanarek-latest` release is a separate moving artifact. Preview APKs use a separate `com.kanarek.preview` application ID and debug signature and install beside release APKs.
 
-Repository workflows live in `.github/workflows/`.
+## Boundaries
 
-- `android-ci.yml`: builds play and foss debug APKs, runs Android lint and JVM tests.
-- `worker-ci.yml`: TypeScript typecheck and Vitest tests for Worker changes.
-- `release.yml` ("Rolling release"): on every push to `main` touching `app/`, `shared/` or the
-  Gradle files, builds signed play/foss APKs and republishes them under the moving
-  `kanarek-latest` tag. No workflow here triggers on a pushed tag — publishing a `v<versionName>`
-  tag builds nothing.
-- Production Worker deployment is owned by Cloudflare Workers Builds and runs from `worker/` on `main` changes.
-- GitHub CodeQL default setup provides repository code scanning.
-- Dependabot handles dependency updates according to the repository configuration.
-
-Android build output should be verified through CI when the local environment cannot provide the required SDK and exact Gradle setup.
-
-## Android notes
-
-- The player requests notification permission on Android 13+ when needed for notification and lock-screen controls. Playback itself can continue without the visible notification permission.
-- Slideshow auto-advance depends partly on launcher support for `autoAdvanceViewId`; the flipper also starts itself as a fallback.
-- Widget layouts must contain only RemoteViews-supported classes.
-- Widget PendingIntents remain immutable. The news widget uses an activity trampoline for article links.
-- Widget images use raw network fetching and the shared `WidgetImageCache`, not Coil.
-- A failed news refresh keeps the last successful item set.
-- Default feed changes must stay synchronized between the app and the Worker.
-- Pure data codecs should remain free of Android imports so they can run in JVM tests.
-
-## Release flavors
-
-The intended release artifacts are:
-
-- `kanarek-<version>.apk` for the play flavor,
-- `kanarek-<version>-foss.apk` for the GMS-free flavor.
-
-`app/build.gradle.kts` is the version source of truth. Standalone release tags use `v<versionName>`, matching the migrated `v1.0.0` and `v1.0.1` tags and the F-Droid metadata. Before a new release, bump `versionName` and increase `versionCode`, merge that change to `main`, then tag the release commit with the matching `v<versionName>` tag.
-
-Release signing uses repository secrets `KEYSTORE_BASE64`, `KEYSTORE_PASSWORD`, `KEY_ALIAS`, and `KEY_PASSWORD`. The rolling release is currently producing signed APKs, so the migrated signing path is operational; the secret values remain external GitHub state and cannot be inspected from repository contents.
-
-Further reading:
-
-- [Architecture](ARCHITECTURE.md)
-- [Worker and API](WORKER.md)
-- [Project history](HISTORY.md)
+Keep portable logic under `shared/`; keep Android lifecycle/state under `app/`. Never make the Worker mandatory for standard feeds or leak Google-specific APIs into `foss`. Keep one app station store and one playback service. See [Architecture](ARCHITECTURE.md), [Tools](TOOLS_INTEGRATION.md), [Worker](WORKER.md) and [F-Droid](FDROID.md).
