@@ -14,22 +14,24 @@ The third page is in the existing Compose navigation. Playback stays in Kanarek'
 
 ## Offline and online
 
-`.github/scripts/stage-benches.sh` builds verified single-file portable assets from **one pinned twojstar commit**. Android CI and release pipelines stage them before APK packaging. Assets are kept out of Git. Locally, stage first with Node 24, git and npm; without the assets, Kanarek uses the hosted Bench pages.
+`.github/scripts/stage-benches.sh` builds verified single-file portable assets from **one pinned twojstar commit**. Android CI and release pipelines stage them before APK packaging. Assets are kept out of Git. Locally, stage first with Node 24, npm, git, Bash 4+ and `sha256sum`; without the assets, Kanarek opens the hosted Bench pages directly (no offline/hosted switch).
 
-Each bundled Bench has its own HTTPS-like `WebViewAssetLoader` origin, e.g. `https://codebench.appassets.androidplatform.net/bench/portable.html`. Embedded content has restricted navigation and network requests. The user may explicitly switch to hosted mode when bundled; this is not a private/offline mode. Streambench online provider/relay functionality uses its existing constrained Worker.
+Each bundled Bench has its own HTTPS-like `WebViewAssetLoader` origin, e.g. `https://codebench.appassets.androidplatform.net/bench/portable.html`. Embedded content has restricted navigation and network requests. The user may explicitly switch to hosted mode when bundled; without bundled assets there is no switch or confirmation. Hosted pages are network-dependent and do not provide the same local-only privacy boundary. Streambench online provider/relay functionality uses its existing constrained Worker.
 
 ## Files and exports
 
 - Android `ACTION_VIEW` / `ACTION_SEND` imports use temporary URI grants and a **native chooser**, then send only the chosen content to the selected Bench.
 - Small imported files are read-only and limited to **4 MiB**; plain-text shares are accepted. File types route to the corresponding Bench, with a user choice for ambiguous files such as M3U or XML.
-- A bounded, versioned message path transfers imports only into a trusted Bench origin. Hosted mode is an explicit trust decision: the page may make its own network requests.
+- After the user selects a destination, a bounded import script is injected via `evaluateJavascript` only into that Bench's trusted bundled or hosted HTTPS origin. Hosted pages may make their own network requests; using them does not guarantee local-only handling.
 - Bundled Blob exports use a chunked receiver with a **32 MiB** limit and `ACTION_CREATE_DOCUMENT`. The user picks where to save; the source URI is not silently overwritten.
 - The scanner interprets common QR payloads (URLs, Wi-Fi, contacts, calendar events, calls/messages, location and text). External actions need an explicit tap. Sensitive Wi-Fi passwords are masked in the preview.
 - The Scan Quick Settings tile uses a one-use token before automatic camera opening. No QR content is silently stored or sent to a Worker.
 
-The native WebView bridge is deliberately constrained: no general-purpose JS interface for unrelated websites, broad filesystem permissions or unbounded downloads. This follows AndroidX's `WebViewAssetLoader` HTTPS-origin model.
+The native WebView bridge is deliberately constrained: `KanarekExport` is bundled-main-frame-only; Codebench's `KanarekScan` accepts its bundled or exact hosted origin. No general-purpose JS interface for unrelated websites, broad filesystem permissions or unbounded downloads. The bundled path follows AndroidX's `WebViewAssetLoader` HTTPS-origin model.
 
 ## Constraints and follow-up validation
+
+**Export or save before leaving a Bench.** Switching to News or Radio & TV, or returning to the Tools hub, destroys the Bench WebView and discards unsaved in-memory edits.
 
 - Bundled tools can work offline; remote stream playback, Streambench providers/relay and hosted mode require connectivity.
 - Keep upstream Bench source, deployment and test ownership in `twojstar`. Update the single staging pin and all hashes together, never the generated HTML by hand.

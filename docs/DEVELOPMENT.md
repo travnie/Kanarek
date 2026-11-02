@@ -17,7 +17,7 @@ gradle wrapper --gradle-version "$GRADLE_VERSION" --no-daemon
 
 ### Bundled Benches
 
-CI release and preview APKs include pinned portable Bench assets. For equivalent local builds, install **Node 24**, npm and git, then run this **before** assembling:
+CI release and preview APKs include pinned portable Bench assets. For equivalent local builds, install **Node 24**, npm, git, **Bash 4+** and **`sha256sum` on `PATH`**, then run this **before** assembling (stock macOS Bash 3.2 and the default checksum utilities are insufficient):
 
 ```sh
 bash .github/scripts/stage-benches.sh
@@ -53,7 +53,7 @@ cd worker && npm ci && npm run typecheck && npm test
 
 Use `.github/scripts/sync-default-feeds.mjs` and its CI check for changes to bundled feed defaults. Do not modify generated results independently.
 
-Release signing requires external `KEYSTORE_BASE64`, `KEYSTORE_PASSWORD`, `KEY_ALIAS` and `KEY_PASSWORD` secrets. For tagged releases update `versionCode` / `versionName` in `app/build.gradle.kts` and use a matching `v<versionName>` tag; the rolling `kanarek-latest` release is a separate moving artifact. Preview APKs use a separate `com.kanarek.preview` application ID and debug signature and install beside release APKs.
+Release signing requires external `KEYSTORE_BASE64`, `KEYSTORE_PASSWORD`, `KEY_ALIAS` and `KEY_PASSWORD` secrets. For F-Droid version tracking, update `versionCode` / `versionName` in `app/build.gradle.kts` and use a matching `v<versionName>` tag. Pushing a tag does **not** trigger an APK build: `release.yml` publishes the moving `kanarek-latest` artifacts for relevant `main` changes or manual dispatch. Preview APKs use a separate `com.kanarek.preview` application ID and debug signature and install beside release APKs.
 
 ## Boundaries
 

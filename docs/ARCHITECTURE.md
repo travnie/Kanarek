@@ -28,9 +28,9 @@ Reader state, saved/offline articles, notifications and cache cleanup are Androi
 
 The three Benches are embedded as **pinned generated assets** staged by `.github/scripts/stage-benches.sh` from a single twojstar revision. The script verifies per-Bench hashes; generated HTML must never be hand-edited here.
 
-`OfflineBenches` serves each asset through an isolated HTTPS-like `WebViewAssetLoader` origin and restricts requests. Only the existing allowlisted Streambench API is reachable from its offline mode. Hosted mode is an explicit user choice, not an offline fallback guarantee.
+`OfflineBenches` serves each asset through an isolated HTTPS-like `WebViewAssetLoader` origin and restricts requests. Only the existing allowlisted Streambench API is reachable from its offline mode. With bundled assets, hosted mode requires an explicit switch; without staged assets, the Bench opens its hosted page directly without a mode switch or confirmation. Hosted pages require network connectivity.
 
-Android's share/view intents carry scoped URI access. `IncomingBenchFiles` performs bounded, read-only imports after the user selects a Bench. `BenchExportReceiver` handles bounded, chunked exports with the system save picker. Only trusted bundled main-frame origins receive native bridging; no unrestricted third-party JS interface, silent upload, or blanket filesystem permission. The original file is not edited in place.
+Android's share/view intents carry scoped URI access. `IncomingBenchFiles` performs bounded, read-only imports after the user selects a Bench. `BenchExportReceiver` handles bounded, chunked exports with the system save picker. The `KanarekExport` message bridge is restricted to bundled main frames. Codebench's `KanarekScan` listener accepts scan messages from its bundled or exact trusted hosted HTTPS origin, while user-confirmed imports use bounded `evaluateJavascript` delivery into the selected trusted bundled **or hosted** Bench page. No unrestricted third-party JS interface, automatic upload by Kanarek, or blanket filesystem permission. Hosted pages may make their own network requests. The original file is not edited in place.
 
 The Quick Settings scan tile requires a one-use token. Scan results are parsed locally; opening a link, inserting a contact or using another system action requires an explicit user tap.
 
