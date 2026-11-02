@@ -41,7 +41,7 @@ An optional Cloudflare Worker accelerates fetching and provides additional netwo
 
 - storage screen with feed/image cache sizes and manual cleanup,
 - per-article read/hidden/saved history with optional offline content,
-- portable backup and restore for reader settings, feeds, stations and saved state.
+- portable backup and restore for reader settings, feeds, stations and saved articles (read/hidden history is not included).
 
 ### Radio and IPTV
 
@@ -104,10 +104,15 @@ GRADLE_VERSION=$(sed -n 's#^distributionUrl=.*/gradle-\([0-9][A-Za-z0-9.-]*\)-\(
 command -v gradle >/dev/null || { echo "Install Gradle $GRADLE_VERSION first" >&2; exit 1; }
 gradle --version | grep -F "Gradle $GRADLE_VERSION" >/dev/null || { echo "Use Gradle $GRADLE_VERSION to bootstrap the wrapper" >&2; exit 1; }
 gradle wrapper --gradle-version "$GRADLE_VERSION" --no-daemon
-# For an offline-Bench APK, stage the pinned assets first (Node 24 + npm + git).
-# bash .github/scripts/stage-benches.sh
 ./gradlew assembleDebug
 ./gradlew testPlayDebugUnitTest
+```
+
+To include the bundled offline Benches in a local APK, install Node 24, git, Bash 4+ and `sha256sum`, then stage the pinned assets **before** assembling:
+
+```bash
+bash .github/scripts/stage-benches.sh
+./gradlew assembleDebug
 ```
 
 ## [License](LICENSE)
