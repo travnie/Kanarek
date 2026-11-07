@@ -242,9 +242,10 @@ class NewsRepository(
             ?.takeIf { it.isNotBlank() }
             ?.let { runCatching { Instant.parse(it).toEpochMilli() }.getOrNull() }
 
+    // Subscription URL stays the state key; only the request follows retired Feedseek URLs.
     private fun download(rawUrl: String): String {
         val conn =
-            (URL(rawUrl).openConnection() as HttpURLConnection).apply {
+            (URL(canonicalFeedUrl(rawUrl)).openConnection() as HttpURLConnection).apply {
                 connectTimeout = TIMEOUT_MS
                 readTimeout = TIMEOUT_MS
                 instanceFollowRedirects = true
@@ -280,14 +281,14 @@ class NewsRepository(
                 "https://news.google.com/atom?hl=pl&gl=PL&ceid=PL:pl",
                 "https://pl.euronews.com/rss?format=mrss",
                 "https://antyweb.pl/feed/",
-                "${FEEDSEEK_BASE}pap.xml",
-                "${FEEDSEEK_BASE}reuters.xml",
-                "${FEEDSEEK_BASE}wikipedia_pl.xml",
-                "${FEEDSEEK_BASE}daily_digest.xml",
-                "${FEEDSEEK_BASE}daily_quote.xml",
-                "${FEEDSEEK_BASE}jbzd.xml",
-                "${FEEDSEEK_BASE}beatport_top100.xml",
-                "${FEEDSEEK_BASE}cloudflare.xml",
+                "https://trvny.github.io/feedseek/pap.xml",
+                "https://trvny.github.io/feedseek/reuters.xml",
+                "https://trvny.github.io/feedseek/wikipedia_pl.xml",
+                "https://trvny.github.io/feedseek/daily_digest.xml",
+                "https://trvny.github.io/feedseek/daily_quote.xml",
+                "https://trvny.github.io/feedseek/jbzd.xml",
+                "https://trvny.github.io/feedseek/beatport_top100.xml",
+                "https://trvny.github.io/feedseek/cloudflare.xml",
             )
 
         /** Deployed Cloudflare Worker — kanarek/worker/. */

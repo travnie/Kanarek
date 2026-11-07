@@ -232,7 +232,7 @@ class SettingsStore(
 
     private fun decodeFeeds(raw: String?): List<String> {
         val urls = raw?.split(",")?.map { it.trim() }?.filter { it.isNotEmpty() } ?: emptyList()
-        return canonicalFeedUrls(urls).ifEmpty { NewsRepository.DEFAULT_FEEDS }
+        return urls.ifEmpty { NewsRepository.DEFAULT_FEEDS }
     }
 
     private fun decodeSources(raw: String?): Set<String> =
