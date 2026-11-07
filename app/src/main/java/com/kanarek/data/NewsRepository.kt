@@ -280,14 +280,14 @@ class NewsRepository(
                 "https://news.google.com/atom?hl=pl&gl=PL&ceid=PL:pl",
                 "https://pl.euronews.com/rss?format=mrss",
                 "https://antyweb.pl/feed/",
-                "https://raw.githubusercontent.com/trvny/feedseek/main/feeds/feed_pap.xml",
-                "https://raw.githubusercontent.com/trvny/feedseek/main/feeds/feed_reuters.xml",
-                "https://raw.githubusercontent.com/trvny/feedseek/main/feeds/feed_wikipedia_pl.xml",
-                "https://raw.githubusercontent.com/trvny/feedseek/main/feeds/feed_daily_digest.xml",
-                "https://raw.githubusercontent.com/trvny/feedseek/main/feeds/feed_daily_quote.xml",
-                "https://raw.githubusercontent.com/trvny/feedseek/main/feeds/feed_jbzd.xml",
-                "https://raw.githubusercontent.com/trvny/feedseek/main/feeds/feed_beatport_top100.xml",
-                "https://raw.githubusercontent.com/trvny/feedseek/main/feeds/feed_cloudflare.xml",
+                "${FEEDSEEK_BASE}pap.xml",
+                "${FEEDSEEK_BASE}reuters.xml",
+                "${FEEDSEEK_BASE}wikipedia_pl.xml",
+                "${FEEDSEEK_BASE}daily_digest.xml",
+                "${FEEDSEEK_BASE}daily_quote.xml",
+                "${FEEDSEEK_BASE}jbzd.xml",
+                "${FEEDSEEK_BASE}beatport_top100.xml",
+                "${FEEDSEEK_BASE}cloudflare.xml",
             )
 
         /** Deployed Cloudflare Worker — kanarek/worker/. */
