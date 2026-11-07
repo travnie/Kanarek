@@ -164,7 +164,8 @@ export async function handleFeeds(req: Request, url: URL, env: Env, ctx: Executi
   const valid: string[] = [];
   for (const f of feeds) {
     try {
-      const h = new URL(f);
+      // Policy applies to the host actually fetched; f stays the subscription key.
+      const h = new URL(feedseekFetchUrl(f));
       if (h.protocol !== "https:" && h.protocol !== "http:") continue;
       if (!hostAllowed(h.hostname, env)) continue;
       valid.push(f);
