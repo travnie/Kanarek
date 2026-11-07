@@ -57,7 +57,7 @@ class ReaderSubscriptionsTest {
 
     @Test fun feedseekChannelsHaveDistinctLabelsBeforeFirstFetch() {
         val urls = listOf(
-            "https://raw.githubusercontent.com/trvny/feedseek/main/feeds/feed_pap.xml",
+            "https://trvny.github.io/feedseek/pap.xml",
             "https://raw.githubusercontent.com/trvny/feedseek/main/feeds/feed_reuters.xml",
         )
         assertEquals(

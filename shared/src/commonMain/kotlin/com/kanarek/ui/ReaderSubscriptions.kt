@@ -66,7 +66,10 @@ private fun subscriptionFallbackTitle(url: String): String {
     if (host.isBlank()) return url
     val filename = remainder.substringAfter('/', "").substringBefore('?')
         .trimEnd('/').substringAfterLast('/')
-    if (host == "raw.githubusercontent.com" && filename.startsWith("feed_")) {
+    val feedseek = (host == "raw.githubusercontent.com" && filename.startsWith("feed_")) ||
+        (host == "trvny.github.io" &&
+            remainder.substringAfter('/', "").substringBefore('?') == "feedseek/$filename")
+    if (feedseek && filename.isNotEmpty()) {
         return filename.removePrefix("feed_").substringBeforeLast('.')
             .replace('_', ' ').uppercase()
     }

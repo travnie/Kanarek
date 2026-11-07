@@ -164,7 +164,8 @@ export async function handleFeeds(req: Request, url: URL, env: Env, ctx: Executi
   const valid: string[] = [];
   for (const f of feeds) {
     try {
-      const h = new URL(f);
+      // Policy applies to the host actually fetched; f stays the subscription key.
+      const h = new URL(feedseekFetchUrl(f));
       if (h.protocol !== "https:" && h.protocol !== "http:") continue;
       if (!hostAllowed(h.hostname, env)) continue;
       valid.push(f);
@@ -832,11 +833,22 @@ async function fetchText(target: string, timeoutMs: number, env: Env): Promise<s
   }
 }
 
+const FEEDSEEK_BASE = "https://trvny.github.io/feedseek/";
+const FEEDSEEK_RAW_BASE = "https://raw.githubusercontent.com/trvny/feedseek/main/feeds/";
+
+/** Retired Feedseek URLs (raw main, legacy feed_ names) -> short Pages URL. Fetch-time only; callers keep the subscribed URL as key. */
+export function feedseekFetchUrl(url: string): string {
+  const name = url.startsWith(FEEDSEEK_RAW_BASE) ? url.slice(FEEDSEEK_RAW_BASE.length)
+    : url.startsWith(FEEDSEEK_BASE) ? url.slice(FEEDSEEK_BASE.length) : null;
+  if (name === null || !name.startsWith("feed_") || name.includes("/")) return url;
+  return FEEDSEEK_BASE + name.slice("feed_".length);
+}
+
 async function fetchFeed(feedUrl: string, env: Env): Promise<NewsItem[]> {
   const ctrl = new AbortController();
   const t = setTimeout(() => ctrl.abort(), FEED_TIMEOUT_MS);
   try {
-    const res = await fetchOutbound(feedUrl, env, {
+    const res = await fetchOutbound(feedseekFetchUrl(feedUrl), env, {
       signal: ctrl.signal,
       headers: { "user-agent": "kanarek/1.0 (+https://github.com/travnie/kanarek)", accept: "application/rss+xml, application/atom+xml, application/xml, text/xml" },
       cf: { cacheTtl: CACHE_TTL_S, cacheEverything: true },
