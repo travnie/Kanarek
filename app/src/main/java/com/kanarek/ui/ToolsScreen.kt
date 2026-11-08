@@ -571,7 +571,7 @@ private fun BenchWebView(
 
     val webView = remember(bench, useHosted) {
         WebView(context).apply {
-            settings.javaScriptEnabled = true
+            settings.javaScriptEnabled = false
             settings.domStorageEnabled = true
             settings.allowFileAccess = false
             // Content URIs from the system picker are explicitly user-selected.
