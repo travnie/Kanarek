@@ -9,6 +9,10 @@ on: # yamllint disable-line rule:truthy
     paths:
       - ".github/workflows/copilot-setup-steps.yml"
 
+concurrency:
+  group: copilot-setup-${{ github.event_name == 'pull_request' && github.ref || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   copilot-setup-steps:
     runs-on: ubuntu-latest
