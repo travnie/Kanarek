@@ -53,7 +53,7 @@ internal suspend fun <T, R> mapConcurrent(
  */
 class NewsRepository(
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
-    private val parseFeed: suspend (String) -> List<NewsItem> = FeedParser::parse,
+    private val parseFeed: suspend (String) -> List<NewsItem> = FeedParser::parseStrict,
 ) {
     /** Blocking fetch — safe to call from a background thread (e.g. the widget factory). */
     fun fetchBlocking(
@@ -98,14 +98,11 @@ class NewsRepository(
         val selectedFeeds = feeds.take(MAX_FEEDS_PER_REQUEST)
         if (backendUrl.isNotBlank()) {
             try {
-                val items =
+                val backendResult =
                     runInterruptible(ioDispatcher) {
                         fetchFromBackend(backendUrl, selectedFeeds, fetchLimit, cache)
                     }
-                return NewsFetchResult(
-                    items = finalize(items, limit, perSourceCap),
-                    successfulSources = selectedFeeds.size,
-                )
+                return backendResult.copy(items = finalize(backendResult.items, limit, perSourceCap))
             } catch (error: CancellationException) {
                 throw error
             } catch (_: Exception) {
@@ -181,7 +178,7 @@ class NewsRepository(
         feeds: List<String>,
         limit: Int,
         cache: FeedCache?,
-    ): List<NewsItem> {
+    ): NewsFetchResult {
         val base = backendUrl.trimEnd('/')
         val feedsParam =
             URLEncoder.encode(
@@ -206,7 +203,7 @@ class NewsRepository(
             val code = conn.responseCode
             if (code == HttpURLConnection.HTTP_NOT_MODIFIED) {
                 val body = cached?.body ?: error("304 without cached body for $urlStr")
-                return parseBackendJson(body)
+                return parseBackendJson(body, feeds)
             }
             if (code !in 200..299) error("HTTP $code for $urlStr")
             val body = conn.inputStream.use { it.readTextCapped(MAX_BACKEND_BYTES) }
@@ -214,15 +211,25 @@ class NewsRepository(
             if (cache != null && key != null && !etag.isNullOrBlank()) {
                 cache.write(key, etag, body)
             }
-            return parseBackendJson(body)
+            return parseBackendJson(body, feeds)
         } finally {
             conn.disconnect()
         }
     }
 
-    private fun parseBackendJson(json: String): List<NewsItem> {
-        val items = JSONObject(json).optJSONArray("items") ?: return emptyList()
-        return (0 until items.length()).mapNotNull { i ->
+    private fun parseBackendJson(json: String, requestedFeeds: List<String>): NewsFetchResult {
+        val payload = JSONObject(json)
+        val items = payload.optJSONArray("items") ?: error("backend response missing items")
+        // Missing status data is not proof that every requested feed succeeded.
+        // Fall back to direct parsing for older/custom backends.
+        val sources = payload.optJSONArray("sources") ?: error("backend response missing sources")
+        val successful = buildSet {
+            for (i in 0 until sources.length()) {
+                val source = sources.optJSONObject(i) ?: continue
+                if (source.optString("status") == "ok") add(source.optString("url"))
+            }
+        }
+        val parsed = (0 until items.length()).mapNotNull { i ->
             val o = items.optJSONObject(i) ?: return@mapNotNull null
             val title = o.optString("title").takeIf { it.isNotBlank() } ?: return@mapNotNull null
             val link = o.optString("link").takeIf { it.isNotBlank() } ?: return@mapNotNull null
@@ -235,6 +242,7 @@ class NewsRepository(
                 publishedAtMillis = parseIso(o.optString("date")),
             )
         }
+        return NewsFetchResult(parsed, requestedFeeds.count(successful::contains))
     }
 
     private fun parseIso(s: String?): Long? =
