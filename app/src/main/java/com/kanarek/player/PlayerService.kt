@@ -127,6 +127,8 @@ class PlayerService : MediaSessionService() {
     private var stabilityJob: Job? = null
     private var stabilityGeneration = 0L
 
+    private val logoPrefetchGate = LogoPrefetchGate()
+
     private val binder = LocalBinder()
 
     inner class LocalBinder : Binder() {
@@ -606,16 +608,23 @@ class PlayerService : MediaSessionService() {
     }
 
     private fun prefetchLogo(url: String?) {
-        if (url.isNullOrBlank()) return
+        if (url.isNullOrBlank() || !logoPrefetchGate.tryStart(url)) return
         scope.launch(Dispatchers.IO) {
-            val cached =
-                runCatching {
-                    com.kanarek.widget.WidgetImageCache
-                        .get(applicationContext, url)
-                }.getOrNull()
-            if (cached == null) {
-                fetchAndCacheBitmap(applicationContext, url)
-                pushWidget()
+            var ready = false
+            try {
+                val cached =
+                    runCatching {
+                        com.kanarek.widget.WidgetImageCache.get(applicationContext, url)
+                    }.getOrNull()
+                if (cached != null) {
+                    ready = true
+                    return@launch
+                }
+                ready = fetchAndCacheBitmap(applicationContext, url)
+                // Only a newly cached logo warrants another widget update.
+                if (ready) pushWidget()
+            } finally {
+                logoPrefetchGate.finish(url, ready)
             }
         }
     }
@@ -663,7 +672,7 @@ class PlayerService : MediaSessionService() {
         private fun fetchAndCacheBitmap(
             context: Context,
             url: String,
-        ) {
+        ): Boolean =
             runCatching {
                 val conn =
                     (URL(url).openConnection() as HttpURLConnection).apply {
@@ -672,17 +681,15 @@ class PlayerService : MediaSessionService() {
                         instanceFollowRedirects = true
                     }
                 try {
-                    if (conn.responseCode !in 200..299) return
+                    if (conn.responseCode !in 200..299) return@runCatching false
                     val bytes = conn.inputStream.use { it.readBytesCapped(MAX_IMAGE_BYTES) }
-                    decodeScaled(bytes, MAX_IMAGE_PX)?.let {
-                        com.kanarek.widget.WidgetImageCache
-                            .put(context, url, it)
-                    }
+                    val image = decodeScaled(bytes, MAX_IMAGE_PX) ?: return@runCatching false
+                    com.kanarek.widget.WidgetImageCache.put(context, url, image)
+                    true
                 } finally {
                     conn.disconnect()
                 }
-            }
-        }
+            }.getOrDefault(false)
 
         private fun decodeScaled(
             bytes: ByteArray,
