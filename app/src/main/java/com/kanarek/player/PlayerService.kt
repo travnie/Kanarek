@@ -26,6 +26,7 @@ import com.kanarek.R
 import com.kanarek.cast.CastGlue
 import com.kanarek.data.SettingsStore
 import com.kanarek.data.Station
+import com.kanarek.data.stationIndexForHandoff
 import com.kanarek.data.readBytesCapped
 import com.kanarek.widget.PlayerWidgetProvider
 import kotlinx.coroutines.CoroutineScope
@@ -238,11 +239,17 @@ class PlayerService : MediaSessionService() {
         scope.launch {
             val stations = settings.stationsNow()
             if (stations.isNotEmpty()) {
-                setPlaylistInternal(
-                    stations,
-                    startId = settings.lastStationIdNow(),
-                    autoplay = false,
-                )
+                if (activePlayer === player) {
+                    setPlaylistInternal(
+                        stations,
+                        startId = settings.lastStationIdNow(),
+                        autoplay = false,
+                    )
+                } else {
+                    // Preserve a receiver queue already active during service startup.
+                    _uiState.value = _uiState.value.copy(stations = stations)
+                    pushState()
+                }
             }
         }
     }
@@ -444,14 +451,17 @@ class PlayerService : MediaSessionService() {
         session.player = target
         _videoSize.value = VideoSize()
         val stations = _uiState.value.stations
-        // stop() leaves the local queue allocated but the player IDLE. Rebuild/prepare
-        // it when Cast disconnects, including after a station change while casting.
-        // Do not replace an existing Cast session queue on connect.
-        if (stations.isNotEmpty() && needsHandoffRestore(target === player, target.mediaItemCount)) {
-            val startIndex = handoffTargetIndex(stations, mediaId, index)
-            target.setMediaItems(stations.map { it.toMediaItem() }, startIndex, C.TIME_UNSET)
-            target.prepare()
-            target.playWhenReady = wasPlaying
+        // Only the stopped local engine needs automatic restoration. Cast can have
+        // a receiver queue not yet reflected in its timeline; never overwrite it here.
+        if (target === player) {
+            if (stations.isEmpty()) {
+                target.clearMediaItems()
+            } else {
+                val startIndex = stationIndexForHandoff(stations, mediaId, index)
+                target.setMediaItems(stations.map { it.toMediaItem() }, startIndex, C.TIME_UNSET)
+                target.prepare()
+                target.playWhenReady = wasPlaying
+            }
         }
         pushState()
     }
