@@ -585,7 +585,7 @@ class PlayerService : MediaSessionService() {
         pushWidget()
     }
 
-    private fun pushWidget() {
+    private fun pushWidget(scheduleLogoFetch: Boolean = true) {
         val state = _uiState.value
         val station =
             state.currentStation?.let { current ->
@@ -597,7 +597,7 @@ class PlayerService : MediaSessionService() {
                     current
                 }
             }
-        prefetchLogo(station?.logoUrl)
+        if (scheduleLogoFetch) prefetchLogo(station?.logoUrl)
         PlayerWidgetProvider.updateAll(
             context = applicationContext,
             station = station,
@@ -616,13 +616,13 @@ class PlayerService : MediaSessionService() {
                     runCatching {
                         com.kanarek.widget.WidgetImageCache.get(applicationContext, url)
                     }.getOrNull()
-                if (cached != null) {
-                    ready = true
-                    return@launch
+                ready = cached != null || fetchAndCacheBitmap(applicationContext, url)
+                // Serialize widget updates on Main; never reschedule from the completion.
+                if (ready) {
+                    scope.launch(Dispatchers.Main.immediate) {
+                        pushWidget(scheduleLogoFetch = false)
+                    }
                 }
-                ready = fetchAndCacheBitmap(applicationContext, url)
-                // Only a newly cached logo warrants another widget update.
-                if (ready) pushWidget()
             } finally {
                 logoPrefetchGate.finish(url, ready)
             }

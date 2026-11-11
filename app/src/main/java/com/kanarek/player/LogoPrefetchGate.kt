@@ -4,6 +4,7 @@ package com.kanarek.player
 internal class LogoPrefetchGate(
     private val nowMillis: () -> Long = { System.nanoTime() / 1_000_000L },
     private val retryDelayMillis: Long = 5 * 60_000L,
+    private val maxFailedUrls: Int = 128,
 ) {
     private val inFlight = mutableSetOf<String>()
     private val retryAfter = mutableMapOf<String, Long>()
@@ -21,9 +22,13 @@ internal class LogoPrefetchGate(
     @Synchronized
     fun finish(url: String, succeeded: Boolean) {
         inFlight.remove(url)
+        retryAfter.entries.removeAll { it.value <= nowMillis() }
         if (succeeded) {
             retryAfter.remove(url)
         } else {
+            if (url !in retryAfter && retryAfter.size >= maxFailedUrls.coerceAtLeast(1)) {
+                retryAfter.keys.firstOrNull()?.let(retryAfter::remove)
+            }
             retryAfter[url] = nowMillis() + retryDelayMillis
         }
     }
