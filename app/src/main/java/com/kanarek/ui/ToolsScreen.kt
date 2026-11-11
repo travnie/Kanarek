@@ -477,6 +477,7 @@ private fun BenchWebView(
         else isTrustedOrigin(target, trustedOrigin)
     var fileCallback by remember { mutableStateOf<ValueCallback<Array<Uri>>?>(null) }
     var cameraRequest by remember { mutableStateOf<PermissionRequest?>(null) }
+    var cameraDialog by remember { mutableStateOf<android.app.AlertDialog?>(null) }
     // A saveable token survives Activity recreation; the bytes stay in private cache.
     var pendingExportToken by rememberSaveable(bench) { mutableStateOf<String?>(null) }
     var stagingExport by remember(bench) { mutableStateOf(false) }
@@ -771,19 +772,51 @@ private fun BenchWebView(
                         request.deny()
                         return
                     }
-                    if (ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) ==
-                        PackageManager.PERMISSION_GRANTED
-                    ) {
-                        request.grant(arrayOf(PermissionRequest.RESOURCE_VIDEO_CAPTURE))
-                    } else {
-                        cameraRequest?.deny()
-                        cameraRequest = request
-                        cameraPermission.launch(Manifest.permission.CAMERA)
-                    }
+                    // App-level CAMERA permission is not consent for an arbitrary page script.
+                    // Ask for each WebView capture request, even after Android permission is granted.
+                    cameraRequest?.deny()
+                    cameraDialog?.dismiss()
+                    cameraRequest = request
+                    val dialog = android.app.AlertDialog.Builder(context)
+                        .setTitle(R.string.tools_camera_permission_title)
+                        .setMessage(R.string.tools_camera_permission_message)
+                        .setPositiveButton(android.R.string.ok) { _, _ ->
+                            if (cameraRequest !== request) return@setPositiveButton
+                            cameraDialog = null
+                            if (ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) ==
+                                PackageManager.PERMISSION_GRANTED
+                            ) {
+                                request.grant(arrayOf(PermissionRequest.RESOURCE_VIDEO_CAPTURE))
+                                cameraRequest = null
+                            } else {
+                                cameraPermission.launch(Manifest.permission.CAMERA)
+                            }
+                        }
+                        .setNegativeButton(android.R.string.cancel) { _, _ ->
+                            if (cameraRequest === request) {
+                                request.deny()
+                                cameraRequest = null
+                            }
+                            cameraDialog = null
+                        }
+                        .setOnCancelListener {
+                            if (cameraRequest === request) {
+                                request.deny()
+                                cameraRequest = null
+                            }
+                            cameraDialog = null
+                        }
+                        .create()
+                    cameraDialog = dialog
+                    dialog.show()
                 }
 
                 override fun onPermissionRequestCanceled(request: PermissionRequest) {
-                    if (cameraRequest === request) cameraRequest = null
+                    if (cameraRequest === request) {
+                        cameraRequest = null
+                        cameraDialog?.dismiss()
+                        cameraDialog = null
+                    }
                 }
             }
             loadUrl(pageUrl)
@@ -815,6 +848,8 @@ private fun BenchWebView(
             fileCallback = null
             cameraRequest?.deny()
             cameraRequest = null
+            cameraDialog?.dismiss()
+            cameraDialog = null
             receiver.reset()
             // No cache cleanup here: rotation also disposes the WebView while
             // the Android save picker is open.
