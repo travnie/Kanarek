@@ -15,7 +15,7 @@ import org.robolectric.annotation.Config
 @Config(sdk = [34])
 class NewsRepositoryParseStatusTest {
     @Test
-    fun malformedFeedIsFailureButValidEmptyRssIsSuccess() {
+    fun malformedFeedFailsWhileValidRssWithFilteredItemsSucceeds() {
         val server = HttpServer.create(InetSocketAddress("127.0.0.1", 0), 0)
         server.createContext("/broken") { exchange ->
             respond(exchange, "not xml at all")
