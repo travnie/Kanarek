@@ -27,6 +27,16 @@ class LogoPrefetchGateTest {
         assertTrue(gate.tryStart(failed))
     }
 
+    @Test fun failedUrlCacheIsBounded() {
+        val gate = LogoPrefetchGate(nowMillis = { 1L }, maxFailedUrls = 2)
+        listOf("first", "second", "third").forEach {
+            assertTrue(gate.tryStart(it))
+            gate.finish(it, succeeded = false)
+        }
+        assertTrue(gate.tryStart("first"))
+        assertFalse(gate.tryStart("third"))
+    }
+
     @Test fun blankUrlsAreIgnored() {
         val gate = LogoPrefetchGate(nowMillis = { 10L })
         assertFalse(gate.tryStart(""))
