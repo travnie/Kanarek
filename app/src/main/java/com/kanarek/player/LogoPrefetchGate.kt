@@ -7,6 +7,7 @@ internal class LogoPrefetchGate(
     private val nowMillis: () -> Long = { System.nanoTime() / 1_000_000L },
     private val retryDelayMillis: Long = 5 * 60_000L,
     private val maxFailedUrls: Int = 128,
+    private val maxRefreshedUrls: Int = 128,
 ) {
     private val inFlight = mutableSetOf<String>()
     private val retryAfter = mutableMapOf<String, Long>()
@@ -27,7 +28,7 @@ internal class LogoPrefetchGate(
     fun shouldRefresh(url: String, downloaded: Boolean): Boolean {
         if (downloaded) refreshed.remove(url)
         if (!refreshed.add(url)) return false
-        if (refreshed.size > maxFailedUrls.coerceAtLeast(1)) {
+        if (refreshed.size > maxRefreshedUrls.coerceAtLeast(1)) {
             refreshed.firstOrNull()?.let(refreshed::remove)
         }
         return true
