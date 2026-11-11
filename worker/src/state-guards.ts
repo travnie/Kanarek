@@ -65,7 +65,12 @@ export async function allowPairClaim(
   ).bind(key, window, maxAttempts).first<{ attempts: number }>();
   // Opportunistic cleanup: bounded persistence without a cron or per-request table scan.
   if (Math.random() < 1 / 64) {
-    await db.prepare("DELETE FROM pair_claim_limits WHERE window_bucket < ?").bind(window - 1).run();
+    // Cleanup must never turn an already-recorded claim into an HTTP 500.
+    try {
+      await db.prepare("DELETE FROM pair_claim_limits WHERE window_bucket < ?").bind(window - 1).run();
+    } catch {
+      // Best-effort maintenance. The next cleanup will retry.
+    }
   }
   return result !== null;
 }
