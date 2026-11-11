@@ -571,7 +571,9 @@ private fun BenchWebView(
 
     val webView = remember(bench, useHosted) {
         WebView(context).apply {
-            settings.javaScriptEnabled = false
+            // Bench apps need scripts; navigation, file access and native bridges stay restricted.
+            settings.javaScriptEnabled = true
+            settings.javaScriptCanOpenWindowsAutomatically = false
             settings.domStorageEnabled = true
             settings.allowFileAccess = false
             // Content URIs from the system picker are explicitly user-selected.
