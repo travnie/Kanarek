@@ -45,6 +45,16 @@ class LogoPrefetchGateTest {
         assertFalse(gate.shouldRefresh("logo", downloaded = false))
     }
 
+    @Test fun refreshedLogoEntriesAreBounded() {
+        val gate = LogoPrefetchGate(nowMillis = { 1L }, maxRefreshedUrls = 2)
+        assertTrue(gate.shouldRefresh("first", downloaded = false))
+        assertTrue(gate.shouldRefresh("second", downloaded = false))
+        assertFalse(gate.shouldRefresh("first", downloaded = false))
+        assertTrue(gate.shouldRefresh("third", downloaded = false))
+        assertTrue(gate.shouldRefresh("first", downloaded = false))
+        assertFalse(gate.shouldRefresh("third", downloaded = false))
+    }
+
     @Test fun blankUrlsAreIgnored() {
         val gate = LogoPrefetchGate(nowMillis = { 10L })
         assertFalse(gate.tryStart(""))
