@@ -60,7 +60,12 @@ export async function allowPairClaim(
     "INSERT INTO pair_claim_limits (client_key, window_bucket, attempts) VALUES (?1, ?2, 1) " +
     "ON CONFLICT(client_key) DO UPDATE SET window_bucket = excluded.window_bucket, " +
     "attempts = CASE WHEN pair_claim_limits.window_bucket = excluded.window_bucket THEN pair_claim_limits.attempts + 1 ELSE 1 END " +
-    "WHERE pair_claim_limits.window_bucket != excluded.window_bucket OR pair_claim_limits.attempts < ?3 RETURNING attempts"
+    "WHERE pair_claim_limits.window_bucket < excluded.window_bucket OR " +
+    "(pair_claim_limits.window_bucket = excluded.window_bucket AND pair_claim_limits.attempts < ?3) RETURNING attempts"
   ).bind(key, window, maxAttempts).first<{ attempts: number }>();
+  // Opportunistic cleanup: bounded persistence without a cron or per-request table scan.
+  if (Math.random() < 1 / 64) {
+    await db.prepare("DELETE FROM pair_claim_limits WHERE window_bucket < ?").bind(window - 1).run();
+  }
   return result !== null;
 }
