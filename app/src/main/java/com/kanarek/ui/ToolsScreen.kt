@@ -477,6 +477,7 @@ private fun BenchWebView(
         else isTrustedOrigin(target, trustedOrigin)
     var fileCallback by remember { mutableStateOf<ValueCallback<Array<Uri>>?>(null) }
     var cameraRequest by remember { mutableStateOf<PermissionRequest?>(null) }
+    var androidPermissionRequest by remember { mutableStateOf<PermissionRequest?>(null) }
     var cameraDialog by remember { mutableStateOf<android.app.AlertDialog?>(null) }
     // A saveable token survives Activity recreation; the bytes stay in private cache.
     var pendingExportToken by rememberSaveable(bench) { mutableStateOf<String?>(null) }
@@ -564,10 +565,12 @@ private fun BenchWebView(
         fileCallback = null
     }
     val cameraPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { allowed ->
-        cameraRequest?.let { request ->
+        val request = androidPermissionRequest
+        androidPermissionRequest = null
+        if (request != null && request === cameraRequest) {
             if (allowed) request.grant(arrayOf(PermissionRequest.RESOURCE_VIDEO_CAPTURE)) else request.deny()
+            cameraRequest = null
         }
-        cameraRequest = null
     }
 
     val webView = remember(bench, useHosted) {
@@ -772,6 +775,10 @@ private fun BenchWebView(
                         request.deny()
                         return
                     }
+                    if (androidPermissionRequest != null) {
+                        request.deny() // Do not attach an earlier OS permission result to this request.
+                        return
+                    }
                     // App-level CAMERA permission is not consent for an arbitrary page script.
                     // Ask for each WebView capture request, even after Android permission is granted.
                     cameraRequest?.deny()
@@ -782,6 +789,7 @@ private fun BenchWebView(
                         .setMessage(R.string.tools_camera_permission_message)
                         .setPositiveButton(android.R.string.ok) { _, _ ->
                             if (cameraRequest !== request) return@setPositiveButton
+                            cameraDialog?.dismiss()
                             cameraDialog = null
                             if (ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) ==
                                 PackageManager.PERMISSION_GRANTED
@@ -789,6 +797,7 @@ private fun BenchWebView(
                                 request.grant(arrayOf(PermissionRequest.RESOURCE_VIDEO_CAPTURE))
                                 cameraRequest = null
                             } else {
+                                androidPermissionRequest = request
                                 cameraPermission.launch(Manifest.permission.CAMERA)
                             }
                         }
@@ -814,6 +823,7 @@ private fun BenchWebView(
                 override fun onPermissionRequestCanceled(request: PermissionRequest) {
                     if (cameraRequest === request) {
                         cameraRequest = null
+                        if (androidPermissionRequest === request) androidPermissionRequest = null
                         cameraDialog?.dismiss()
                         cameraDialog = null
                     }
@@ -848,6 +858,7 @@ private fun BenchWebView(
             fileCallback = null
             cameraRequest?.deny()
             cameraRequest = null
+            androidPermissionRequest = null
             cameraDialog?.dismiss()
             cameraDialog = null
             receiver.reset()
