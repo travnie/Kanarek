@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { parseBearer, cleanIds, genPairCode } from "../src/index";
+import { readLimitedJson } from "../src/state-guards";
 
 describe("parseBearer", () => {
   it("accepts a base64url token of valid length", () => {
@@ -29,9 +30,10 @@ describe("cleanIds", () => {
 
 describe("genPairCode", () => {
   it("is 6 chars from the non-ambiguous alphabet", () => {
-    const c = genPairCode(() => 0.5);
-    expect(c).toHaveLength(6);
-    expect(/^[0-9A-Z]{6}$/.test(c)).toBe(true);
-    expect(/[01OIL]/.test(c)).toBe(false);
+    for (const c of [genPairCode(() => 0.5), genPairCode()]) {
+      expect(c).toHaveLength(6);
+      expect(/^[0-9A-Z]{6}$/.test(c)).toBe(true);
+      expect(/[01OIL]/.test(c)).toBe(false);
+    }
   });
 });

@@ -61,6 +61,7 @@ import { handleArticle } from "./article";
 import { readCapped } from "./read-capped";
 export { readCapped } from "./read-capped";
 import { assertOutboundUrlAllowed, hostAllowed as policyHostAllowed } from "./outbound-policy.js";
+import { securePairCode, readLimitedJson, allowPairClaim } from "./state-guards";
 
 export interface Env {
   /** Optional comma-separated default feeds when the request omits ?feeds= */
@@ -103,6 +104,8 @@ const MAX_SUBS = 500; // cap on per-device subscriptions
 const MAX_DELTA_IDS = 400; // bound add/remove per request (keeps D1 batch well under 1000 stmts)
 const STATE_MAX_BODY = 512_000; // reject oversized state payloads
 const PAIR_TTL_S = 300; // pairing code lifetime
+const PAIR_WINDOW_MS = 5 * 60 * 1000;
+const PAIR_MAX_ATTEMPTS = 12; // per client per window
 const PAIR_ALPHABET = "23456789ABCDEFGHJKMNPQRSTUVWXYZ"; // Crockford-ish, no ambiguous chars
 
 /** Repeating-block selectors tried in order when ?item= is omitted. */
@@ -1103,6 +1106,7 @@ const SCHEMA = [
   "CREATE INDEX IF NOT EXISTS idx_read_token_ts ON read_state (token, ts)",
   "CREATE TABLE IF NOT EXISTS subs_state (token TEXT PRIMARY KEY, feeds TEXT NOT NULL, ts INTEGER NOT NULL)",
   "CREATE TABLE IF NOT EXISTS pair_state (code TEXT PRIMARY KEY, token TEXT NOT NULL, expires_at INTEGER NOT NULL)",
+  "CREATE TABLE IF NOT EXISTS pair_claim_limits (client_key TEXT PRIMARY KEY, window_bucket INTEGER NOT NULL, attempts INTEGER NOT NULL)",
 ];
 let schemaReady = false; // per-isolate guard; CREATE IF NOT EXISTS is idempotent
 
@@ -1118,11 +1122,9 @@ export function parseBearer(authHeader: string | null): string | null {
   return m ? m[1] : null;
 }
 
-/** 6-char pairing code from a non-ambiguous alphabet. */
-export function genPairCode(rnd: () => number = Math.random): string {
-  let s = "";
-  for (let i = 0; i < 6; i++) s += PAIR_ALPHABET[Math.floor(rnd() * PAIR_ALPHABET.length)];
-  return s;
+/** 6-character display code; Web Crypto default, injectable RNG for tests. */
+export function genPairCode(rnd?: () => number): string {
+  return securePairCode(PAIR_ALPHABET, rnd);
 }
 
 /** Coerce to a deduped, length-capped string-id list; drops non-strings/empties. */
@@ -1139,9 +1141,7 @@ export function cleanIds(v: unknown, cap: number): string[] {
 }
 
 async function readBody(req: Request): Promise<unknown> {
-  const raw = await req.text();
-  if (raw.length > STATE_MAX_BODY) throw new Error("payload too large");
-  return raw ? JSON.parse(raw) : {};
+  return readLimitedJson(req, STATE_MAX_BODY);
 }
 
 function noStore(body: unknown, status = 200): Response {
@@ -1224,12 +1224,19 @@ async function handlePairCreate(req: Request, env: Env): Promise<Response> {
   const db = env.STATE_DB;
   await ensureSchema(db);
   const now = Date.now();
-  const code = genPairCode();
   await db.batch([
-    db.prepare("DELETE FROM pair_state WHERE expires_at < ?").bind(now), // opportunistic cleanup
-    db.prepare("INSERT OR REPLACE INTO pair_state (code, token, expires_at) VALUES (?, ?, ?)").bind(code, tok, now + PAIR_TTL_S * 1000),
+    db.prepare("DELETE FROM pair_state WHERE expires_at < ?").bind(now),
+    db.prepare("DELETE FROM pair_claim_limits WHERE window_bucket < ?").bind(Math.floor(now / PAIR_WINDOW_MS) - 1),
   ]);
-  return noStore({ code, expires: PAIR_TTL_S });
+  // Collision must not replace the token of an unclaimed pairing code.
+  for (let attempt = 0; attempt < 5; attempt++) {
+    const code = genPairCode();
+    const result = await db.prepare(
+      "INSERT OR IGNORE INTO pair_state (code, token, expires_at) VALUES (?, ?, ?)"
+    ).bind(code, tok, now + PAIR_TTL_S * 1000).run();
+    if (result.meta.changes > 0) return noStore({ code, expires: PAIR_TTL_S });
+  }
+  return noStore({ error: "unable to allocate pairing code" }, 503);
 }
 
 async function handlePairClaim(req: Request, url: URL, env: Env): Promise<Response> {
@@ -1239,6 +1246,11 @@ async function handlePairClaim(req: Request, url: URL, env: Env): Promise<Respon
   await ensureSchema(db);
   const code = url.pathname.slice("/pair/".length).toUpperCase();
   if (!/^[0-9A-Z]{6}$/.test(code)) return noStore({ error: "bad code" }, 400);
+  if (!(await allowPairClaim(req, db, PAIR_WINDOW_MS, PAIR_MAX_ATTEMPTS))) {
+    const denied = noStore({ error: "too many pairing attempts" }, 429);
+    denied.headers.set("retry-after", String(PAIR_TTL_S));
+    return denied;
+  }
   const row = await db
     .prepare("DELETE FROM pair_state WHERE code = ? AND expires_at >= ? RETURNING token")
     .bind(code, Date.now())
