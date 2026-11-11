@@ -430,6 +430,7 @@ class PlayerService : MediaSessionService() {
         resetFailure()
         val old = activePlayer
         val wasPlaying = old.playWhenReady
+        val mediaId = old.currentMediaItem?.mediaId
         val index =
             if (old.mediaItemCount > 0) {
                 old.currentMediaItemIndex
@@ -443,8 +444,12 @@ class PlayerService : MediaSessionService() {
         session.player = target
         _videoSize.value = VideoSize()
         val stations = _uiState.value.stations
-        if (target.mediaItemCount == 0 && stations.isNotEmpty()) {
-            target.setMediaItems(stations.map { it.toMediaItem() }, index, C.TIME_UNSET)
+        // stop() leaves the local queue allocated but the player IDLE. Rebuild/prepare
+        // it when Cast disconnects, including after a station change while casting.
+        // Do not replace an existing Cast session queue on connect.
+        if (stations.isNotEmpty() && needsHandoffRestore(target === player, target.mediaItemCount)) {
+            val startIndex = handoffTargetIndex(stations, mediaId, index)
+            target.setMediaItems(stations.map { it.toMediaItem() }, startIndex, C.TIME_UNSET)
             target.prepare()
             target.playWhenReady = wasPlaying
         }
