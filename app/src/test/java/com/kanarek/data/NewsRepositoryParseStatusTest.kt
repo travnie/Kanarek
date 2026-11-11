@@ -7,7 +7,10 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
 
+@RunWith(RobolectricTestRunner::class)
 class NewsRepositoryParseStatusTest {
     @Test
     fun malformedFeedIsFailureButValidEmptyRssIsSuccess() {
@@ -16,7 +19,7 @@ class NewsRepositoryParseStatusTest {
             respond(exchange, "not xml at all")
         }
         server.createContext("/empty") { exchange ->
-            respond(exchange, "<rss version=\"2.0\"><channel><title>Empty</title></channel></rss>")
+            respond(exchange, "<rss version=\"2.0\"><channel><title>Empty</title><item><link>https://example.com/no-title</link></item></channel></rss>")
         }
         server.createContext("/blank") { exchange -> respond(exchange, "") }
         server.start()
