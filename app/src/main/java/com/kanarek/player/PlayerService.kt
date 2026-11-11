@@ -247,6 +247,7 @@ class PlayerService : MediaSessionService() {
                     )
                 } else {
                     // Preserve a receiver queue already active during service startup.
+                    updateStreamHeaders(stations)
                     _uiState.value = _uiState.value.copy(stations = stations)
                     pushState()
                 }
@@ -402,19 +403,7 @@ class PlayerService : MediaSessionService() {
             return
         }
         _videoSize.value = VideoSize()
-        streamHeaders.clear()
-        stations.forEach { station ->
-            val headers =
-                buildMap {
-                    station.userAgent?.takeIf { it.isNotBlank() }?.let {
-                        put("User-Agent", it)
-                    }
-                    station.referrer?.takeIf { it.isNotBlank() }?.let {
-                        put("Referer", it)
-                    }
-                }
-            if (headers.isNotEmpty()) streamHeaders[station.streamUrl] = headers
-        }
+        updateStreamHeaders(stations)
         val items = stations.map { it.toMediaItem() }
         val startIndex =
             stations.indexOfFirst { it.id == startId }.let { index ->
@@ -430,6 +419,18 @@ class PlayerService : MediaSessionService() {
                 isPlaying = autoplay,
             )
         pushWidget()
+    }
+
+    private fun updateStreamHeaders(stations: List<Station>) {
+        streamHeaders.clear()
+        stations.forEach { station ->
+            val headers =
+                buildMap {
+                    station.userAgent?.takeIf { it.isNotBlank() }?.let { put("User-Agent", it) }
+                    station.referrer?.takeIf { it.isNotBlank() }?.let { put("Referer", it) }
+                }
+            if (headers.isNotEmpty()) streamHeaders[station.streamUrl] = headers
+        }
     }
 
     private fun switchTo(target: Player) {
