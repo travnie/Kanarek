@@ -477,6 +477,8 @@ private fun BenchWebView(
         else isTrustedOrigin(target, trustedOrigin)
     var fileCallback by remember { mutableStateOf<ValueCallback<Array<Uri>>?>(null) }
     var cameraRequest by remember { mutableStateOf<PermissionRequest?>(null) }
+    var androidPermissionRequest by remember { mutableStateOf<PermissionRequest?>(null) }
+    var cameraDialog by remember { mutableStateOf<android.app.AlertDialog?>(null) }
     // A saveable token survives Activity recreation; the bytes stay in private cache.
     var pendingExportToken by rememberSaveable(bench) { mutableStateOf<String?>(null) }
     var stagingExport by remember(bench) { mutableStateOf(false) }
@@ -563,15 +565,22 @@ private fun BenchWebView(
         fileCallback = null
     }
     val cameraPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { allowed ->
-        cameraRequest?.let { request ->
+        val request = androidPermissionRequest
+        androidPermissionRequest = null
+        if (request != null && request === cameraRequest) {
             if (allowed) request.grant(arrayOf(PermissionRequest.RESOURCE_VIDEO_CAPTURE)) else request.deny()
+            cameraRequest = null
         }
-        cameraRequest = null
     }
 
     val webView = remember(bench, useHosted) {
         WebView(context).apply {
-            settings.javaScriptEnabled = false
+            // Bench apps need scripts; navigation, file access and native bridges stay restricted.
+            // Scripts are required by the first-party Bench tools. Main-frame navigation is
+            // origin-restricted, file access disabled, and native message handlers origin-scoped.
+            // codeql[java/android/websettings-javascript-enabled]
+            settings.javaScriptEnabled = true
+            settings.javaScriptCanOpenWindowsAutomatically = false
             settings.domStorageEnabled = true
             settings.allowFileAccess = false
             // Content URIs from the system picker are explicitly user-selected.
@@ -769,19 +778,58 @@ private fun BenchWebView(
                         request.deny()
                         return
                     }
-                    if (ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) ==
-                        PackageManager.PERMISSION_GRANTED
-                    ) {
-                        request.grant(arrayOf(PermissionRequest.RESOURCE_VIDEO_CAPTURE))
-                    } else {
-                        cameraRequest?.deny()
-                        cameraRequest = request
-                        cameraPermission.launch(Manifest.permission.CAMERA)
+                    if (androidPermissionRequest != null) {
+                        request.deny() // Do not attach an earlier OS permission result to this request.
+                        return
                     }
+                    // App-level CAMERA permission is not consent for an arbitrary page script.
+                    // Ask for each WebView capture request, even after Android permission is granted.
+                    cameraRequest?.deny()
+                    cameraDialog?.dismiss()
+                    cameraRequest = request
+                    val dialog = android.app.AlertDialog.Builder(context)
+                        .setTitle(R.string.tools_camera_permission_title)
+                        .setMessage(R.string.tools_camera_permission_message)
+                        .setPositiveButton(android.R.string.ok) { _, _ ->
+                            if (cameraRequest !== request) return@setPositiveButton
+                            cameraDialog?.dismiss()
+                            cameraDialog = null
+                            if (ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) ==
+                                PackageManager.PERMISSION_GRANTED
+                            ) {
+                                request.grant(arrayOf(PermissionRequest.RESOURCE_VIDEO_CAPTURE))
+                                cameraRequest = null
+                            } else {
+                                androidPermissionRequest = request
+                                cameraPermission.launch(Manifest.permission.CAMERA)
+                            }
+                        }
+                        .setNegativeButton(android.R.string.cancel) { _, _ ->
+                            if (cameraRequest === request) {
+                                request.deny()
+                                cameraRequest = null
+                            }
+                            cameraDialog = null
+                        }
+                        .setOnCancelListener {
+                            if (cameraRequest === request) {
+                                request.deny()
+                                cameraRequest = null
+                            }
+                            cameraDialog = null
+                        }
+                        .create()
+                    cameraDialog = dialog
+                    dialog.show()
                 }
 
                 override fun onPermissionRequestCanceled(request: PermissionRequest) {
-                    if (cameraRequest === request) cameraRequest = null
+                    if (cameraRequest === request) {
+                        cameraRequest = null
+                        if (androidPermissionRequest === request) androidPermissionRequest = null
+                        cameraDialog?.dismiss()
+                        cameraDialog = null
+                    }
                 }
             }
             loadUrl(pageUrl)
@@ -813,6 +861,9 @@ private fun BenchWebView(
             fileCallback = null
             cameraRequest?.deny()
             cameraRequest = null
+            androidPermissionRequest = null
+            cameraDialog?.dismiss()
+            cameraDialog = null
             receiver.reset()
             // No cache cleanup here: rotation also disposes the WebView while
             // the Android save picker is open.
