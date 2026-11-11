@@ -1107,6 +1107,7 @@ const SCHEMA = [
   "CREATE TABLE IF NOT EXISTS subs_state (token TEXT PRIMARY KEY, feeds TEXT NOT NULL, ts INTEGER NOT NULL)",
   "CREATE TABLE IF NOT EXISTS pair_state (code TEXT PRIMARY KEY, token TEXT NOT NULL, expires_at INTEGER NOT NULL)",
   "CREATE TABLE IF NOT EXISTS pair_claim_limits (client_key TEXT PRIMARY KEY, window_bucket INTEGER NOT NULL, attempts INTEGER NOT NULL)",
+  "CREATE INDEX IF NOT EXISTS idx_pair_claim_limits_window ON pair_claim_limits(window_bucket)",
 ];
 let schemaReady = false; // per-isolate guard; CREATE IF NOT EXISTS is idempotent
 
@@ -1248,7 +1249,8 @@ async function handlePairClaim(req: Request, url: URL, env: Env): Promise<Respon
   if (!/^[0-9A-Z]{6}$/.test(code)) return noStore({ error: "bad code" }, 400);
   if (!(await allowPairClaim(req, db, PAIR_WINDOW_MS, PAIR_MAX_ATTEMPTS))) {
     const denied = noStore({ error: "too many pairing attempts" }, 429);
-    denied.headers.set("retry-after", String(PAIR_TTL_S));
+    const windowEnd = (Math.floor(Date.now() / PAIR_WINDOW_MS) + 1) * PAIR_WINDOW_MS;
+    denied.headers.set("retry-after", String(Math.max(1, Math.ceil((windowEnd - Date.now()) / 1000))));
     return denied;
   }
   const row = await db
