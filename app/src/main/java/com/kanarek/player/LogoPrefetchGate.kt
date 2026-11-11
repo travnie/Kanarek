@@ -1,6 +1,8 @@
 package com.kanarek.player
 
-/** Per-service in-flight guard and cooldown for failed widget logo requests. */
+/** Per-service in-flight guard and cooldown for failed widget logo requests.
+ * Failed URLs have bounded retention; the oldest may retry early if the cap fills.
+ */
 internal class LogoPrefetchGate(
     private val nowMillis: () -> Long = { System.nanoTime() / 1_000_000L },
     private val retryDelayMillis: Long = 5 * 60_000L,
@@ -8,6 +10,7 @@ internal class LogoPrefetchGate(
 ) {
     private val inFlight = mutableSetOf<String>()
     private val retryAfter = mutableMapOf<String, Long>()
+    private val refreshed = linkedSetOf<String>()
 
     @Synchronized
     fun tryStart(url: String): Boolean {
@@ -16,6 +19,17 @@ internal class LogoPrefetchGate(
         if (now < (retryAfter[url] ?: Long.MIN_VALUE)) return false
         retryAfter.remove(url)
         inFlight.add(url)
+        return true
+    }
+
+    /** Skip repeat widget redraws for already-cached images; refetches always redraw. */
+    @Synchronized
+    fun shouldRefresh(url: String, downloaded: Boolean): Boolean {
+        if (downloaded) refreshed.remove(url)
+        if (!refreshed.add(url)) return false
+        if (refreshed.size > maxFailedUrls.coerceAtLeast(1)) {
+            refreshed.firstOrNull()?.let(refreshed::remove)
+        }
         return true
     }
 
