@@ -602,7 +602,7 @@ class PlayerService : MediaSessionService() {
                     }.getOrNull()
                 ready = cached != null || fetchAndCacheBitmap(applicationContext, url)
                 // Serialize widget updates on Main; never reschedule from the completion.
-                if (ready) {
+                if (ready && logoPrefetchGate.shouldRefresh(url, downloaded = cached == null)) {
                     scope.launch(Dispatchers.Main.immediate) {
                         pushWidget(scheduleLogoFetch = false)
                     }
