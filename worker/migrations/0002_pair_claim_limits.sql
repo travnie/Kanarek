@@ -5,3 +5,4 @@ CREATE TABLE IF NOT EXISTS pair_claim_limits (
   window_bucket INTEGER NOT NULL,
   attempts INTEGER NOT NULL
 );
+CREATE INDEX IF NOT EXISTS idx_pair_claim_limits_window ON pair_claim_limits(window_bucket);
