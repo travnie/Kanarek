@@ -8,16 +8,20 @@ import kotlin.time.Clock
 object FeedParser {
     private val parser = RssParser()
 
+    /** Tolerant API for callers that only need items. */
     suspend fun parse(xml: String): List<NewsItem> {
         if (xml.isBlank()) return emptyList()
+        return try {
+            parseStrict(xml)
+        } catch (_: RssParsingException) {
+            emptyList()
+        }
+    }
 
-        val channel =
-            try {
-                parser.parse(xml)
-            } catch (_: RssParsingException) {
-                return emptyList()
-            }
-
+    /** Fetchers must distinguish malformed feeds from valid empty channels. */
+    suspend fun parseStrict(xml: String): List<NewsItem> {
+        require(xml.isNotBlank()) { "Empty feed" }
+        val channel = parser.parse(xml)
         val source = plainText(channel.title.orEmpty())
         return channel.items.mapNotNull { item ->
             val title = item.title?.let(::plainText)?.takeIf(String::isNotBlank)

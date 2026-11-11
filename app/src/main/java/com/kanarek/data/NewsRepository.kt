@@ -53,7 +53,7 @@ internal suspend fun <T, R> mapConcurrent(
  */
 class NewsRepository(
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
-    private val parseFeed: suspend (String) -> List<NewsItem> = FeedParser::parse,
+    private val parseFeed: suspend (String) -> List<NewsItem> = FeedParser::parseStrict,
 ) {
     /** Blocking fetch — safe to call from a background thread (e.g. the widget factory). */
     fun fetchBlocking(
