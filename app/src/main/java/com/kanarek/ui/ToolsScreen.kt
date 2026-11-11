@@ -576,6 +576,9 @@ private fun BenchWebView(
     val webView = remember(bench, useHosted) {
         WebView(context).apply {
             // Bench apps need scripts; navigation, file access and native bridges stay restricted.
+            // Scripts are required by the first-party Bench tools. Main-frame navigation is
+            // origin-restricted, file access disabled, and native message handlers origin-scoped.
+            // codeql[java/android/websettings-javascript-enabled]
             settings.javaScriptEnabled = true
             settings.javaScriptCanOpenWindowsAutomatically = false
             settings.domStorageEnabled = true
