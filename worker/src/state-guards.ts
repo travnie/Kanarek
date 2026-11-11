@@ -1,11 +1,22 @@
 /** Stateful edge endpoint guards; keep network input and pairing attempts bounded. */
 
 export function securePairCode(alphabet: string, random?: () => number): string {
-  const values = random ? null : crypto.getRandomValues(new Uint32Array(6));
   let code = "";
-  for (let i = 0; i < 6; i++) {
-    const sample = random ? random() : values![i] / 0x1_0000_0000;
-    code += alphabet[Math.floor(sample * alphabet.length)];
+  if (random) {
+    for (let i = 0; i < 6; i++) code += alphabet[Math.floor(random() * alphabet.length)];
+    return code;
+  }
+  // Mask to the next power-of-two range and reject excess values: no modulo bias.
+  const mask = 2 ** Math.ceil(Math.log2(alphabet.length)) - 1;
+  const bytes = new Uint8Array(16);
+  let offset = bytes.length;
+  while (code.length < 6) {
+    if (offset === bytes.length) {
+      crypto.getRandomValues(bytes);
+      offset = 0;
+    }
+    const index = bytes[offset++] & mask;
+    if (index < alphabet.length) code += alphabet[index];
   }
   return code;
 }
