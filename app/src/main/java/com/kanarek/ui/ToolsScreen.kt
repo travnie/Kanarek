@@ -174,6 +174,37 @@ internal fun ToolsScreen(
     var hostedLoading by remember { mutableStateOf(false) }
     var modeNotice by remember { mutableStateOf<Int?>(null) }
     var showSwitchConfirmation by remember { mutableStateOf(false) }
+    var pendingModeFile by remember {
+        mutableStateOf<Triple<IncomingBenchFile, BenchFileTarget, Boolean>?>(null)
+    }
+    fun cancelPendingModeFile() {
+        pendingModeFile?.let { onFileHandled(it.first.id) }
+        pendingModeFile = null
+        processingFileId = null
+    }
+    fun startFileImport(source: IncomingBenchFile, target: BenchFileTarget, hosted: Boolean) {
+        processingFileId = source.id
+        scope.launch {
+            openingFile = true
+            try {
+                val ready = IncomingBenchFiles.prepare(context, source, target)
+                val startsHostedLoad = hosted && (selectedKey != target.name || !useHosted)
+                preparedFile = ready
+                useHosted = hosted
+                hostedLoading = startsHostedLoad
+                selectedKey = target.name
+            } catch (error: Exception) {
+                fileError =
+                    if ((error as? BenchImportException)?.reason ==
+                        BenchImportException.Reason.TOO_LARGE
+                    ) tooLargeMessage else importFailureMessage
+                processingFileId = null
+                onFileHandled(source.id)
+            } finally {
+                openingFile = false
+            }
+        }
+    }
     val selected = Bench.entries.firstOrNull { it.name == selectedKey }
     fun cancelPendingHostedImport() {
         preparedFile?.let { pending ->
@@ -337,13 +368,26 @@ internal fun ToolsScreen(
     }
     if (showSwitchConfirmation && selected != null) {
         AlertDialog(
-            onDismissRequest = { showSwitchConfirmation = false },
+            onDismissRequest = {
+                showSwitchConfirmation = false
+                cancelPendingModeFile()
+            },
             title = { Text(stringResource(R.string.tools_mode_confirmation_title)) },
             text = { Text(stringResource(R.string.tools_mode_confirmation_text)) },
             confirmButton = {
                 TextButton(onClick = {
                     showSwitchConfirmation = false
-                    if (!useHosted && !hasHostedConnection(context)) {
+                    val pending = pendingModeFile
+                    pendingModeFile = null
+                    if (pending != null) {
+                        if (pending.third && !hasHostedConnection(context)) {
+                            onFileHandled(pending.first.id)
+                            processingFileId = null
+                            modeNotice = R.string.tools_online_unavailable
+                        } else {
+                            startFileImport(pending.first, pending.second, pending.third)
+                        }
+                    } else if (!useHosted && !hasHostedConnection(context)) {
                         modeNotice = R.string.tools_online_unavailable
                     } else {
                         val nextHosted = !useHosted
@@ -353,7 +397,10 @@ internal fun ToolsScreen(
                 }) { Text(stringResource(R.string.tools_mode_confirmation_accept)) }
             },
             dismissButton = {
-                TextButton(onClick = { showSwitchConfirmation = false }) {
+                TextButton(onClick = {
+                    showSwitchConfirmation = false
+                    cancelPendingModeFile()
+                }) {
                     Text(stringResource(R.string.open_with_cancel))
                 }
             },
@@ -375,26 +422,13 @@ internal fun ToolsScreen(
         inboundFile?.takeIf { it.id != processingFileId }?.let { source ->
             val options = IncomingBenchFiles.destinations(source)
             fun selectFileTarget(target: BenchFileTarget, hosted: Boolean) {
-                processingFileId = source.id
-                scope.launch {
-                    openingFile = true
-                    try {
-                        val ready = IncomingBenchFiles.prepare(context, source, target)
-                        val startsHostedLoad = hosted && (selectedKey != target.name || !useHosted)
-                        preparedFile = ready
-                        useHosted = hosted
-                        hostedLoading = startsHostedLoad
-                        selectedKey = target.name
-                    } catch (error: Exception) {
-                        fileError =
-                            if ((error as? BenchImportException)?.reason ==
-                                BenchImportException.Reason.TOO_LARGE
-                            ) tooLargeMessage else importFailureMessage
-                        processingFileId = null
-                        onFileHandled(source.id)
-                    } finally {
-                        openingFile = false
-                    }
+                if (selectedKey == target.name && useHosted != hosted) {
+                    // Reuse the existing warning before discarding an editor WebView.
+                    pendingModeFile = Triple(source, target, hosted)
+                    processingFileId = source.id
+                    showSwitchConfirmation = true
+                } else {
+                    startFileImport(source, target, hosted)
                 }
             }
             AlertDialog(

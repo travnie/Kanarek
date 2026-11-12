@@ -1,19 +1,34 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
+import { pathToFileURL } from "node:url";
 
-// Source-of-truth boundary: old two-tab Docbench or v1 Files ingress.
+// Inspect the staged portable page, then exercise its pinned source API.
 const html = readFileSync(0, "utf8");
 const has = (id) => html.includes(`id="${id}"`);
-const v1 = /DocBenchFiles\s*=\s*Object\.freeze\s*\(\s*\{/.test(html)
-  && /\bversion\s*:\s*1\b/.test(html)
-  && /\bimportFile\s*:\s*\(file\)/.test(html)
-  && /\bcreateFileIngress\s*\(/.test(html);
-if (!v1) {
+if (has("files-workspace")) {
+  const source = process.argv[2];
+  assert.ok(source, "Files-first Docbench requires a pinned source module path");
+  assert.match(html, /nativeIngress\s*=\s*createFileIngress\s*\(\s*store\s*,/);
+  assert.match(html, /globalThis\.DocBenchFiles\s*=\s*Object\.freeze\s*\(\s*\{\s*\.\.\.nativeIngress\s*,/);
+  const { createFileIngress, createFileStore } = await import(pathToFileURL(source).href);
+  const store = createFileStore({ limit: 1 });
+  let activated = false;
+  const ingress = createFileIngress(store, {
+    resetView: () => {},
+    activateFiles: () => { activated = true; },
+  });
+  const file = { name: "notes.txt", size: 4, type: "text/plain", slice: () => new Blob(["test"]) };
+  const result = ingress.importFile(file);
+  assert.equal(ingress.version, 1, "Pinned Docbench Files ingress version mismatch");
+  assert.equal(result.ok, true, "Pinned Docbench Files ingress rejected a normal file");
+  assert.equal(store.activeId(), result.id);
+  assert.equal(activated, true);
+  assert.equal(ingress.importFile(file).ok, false, "Full Files queue should reject imports");
+  console.log("Docbench Files ingress v1 verified");
+} else {
+  assert.ok(!has("files-tab"), "Files-first Docbench cannot use legacy picker fallback");
   for (const id of ["file-input", "document-tab", "pdf-input", "docx-to-pdf-input", "pdf-tab"]) {
-    assert.ok(has(id), `Pinned Docbench lost legacy import control: ${id}`);
+    assert.ok(has(id), `Pinned legacy Docbench lost import control: ${id}`);
   }
+  console.log("Legacy Docbench picker ingress verified");
 }
-if (has("files-tab")) {
-  assert.ok(v1, "Files-first Docbench must expose the canonical importFile v1 contract.");
-}
-console.log(v1 ? "Docbench native ingress v1 verified" : "Legacy Docbench picker ingress verified");

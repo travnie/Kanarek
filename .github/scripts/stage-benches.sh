@@ -41,7 +41,7 @@ for bench in codebench docbench streambench; do
   printf '%s\n' "$source_commit" > "$destination/$bench/SOURCE_COMMIT"
   sha256sum "$destination/$bench/portable.html"
 done
-node .github/scripts/check-docbench-ingress.mjs < "$destination/docbench/portable.html"
+node .github/scripts/check-docbench-ingress.mjs "$scratch/source/benches/docbench/public/file-store.mjs" < "$destination/docbench/portable.html"
 (
   cd "$destination"
   sha256sum codebench/portable.html docbench/portable.html streambench/portable.html > SHA256SUMS
