@@ -175,11 +175,20 @@ internal fun ToolsScreen(
     var modeNotice by remember { mutableStateOf<Int?>(null) }
     var showSwitchConfirmation by remember { mutableStateOf(false) }
     val selected = Bench.entries.firstOrNull { it.name == selectedKey }
+    fun cancelPendingHostedImport() {
+        preparedFile?.let { pending ->
+            onFileHandled(pending.id)
+            preparedFile = null
+            processingFileId = null
+            fileError = importFailureMessage
+        }
+    }
     LaunchedEffect(useHosted, hostedLoading, selected, isActive) {
         if (isActive && selected != null && useHosted && hostedLoading) {
             delay(15_000)
             if (useHosted && hostedLoading) {
-                // A stalled hosted WebView must not strand the user on a blank page.
+                // Never deliver a hosted-only file to the pinned legacy offline editor.
+                cancelPendingHostedImport()
                 hostedLoading = false
                 useHosted = false
                 modeNotice = R.string.tools_online_load_failed
@@ -310,6 +319,7 @@ internal fun ToolsScreen(
                 onHostedLoaded = { if (useHosted) hostedLoading = false },
                 onHostedFailed = {
                     if (useHosted) {
+                        cancelPendingHostedImport()
                         hostedLoading = false
                         useHosted = false
                         modeNotice = R.string.tools_online_load_failed
