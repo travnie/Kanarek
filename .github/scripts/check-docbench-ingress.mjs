@@ -5,8 +5,7 @@ import { readFileSync } from "node:fs";
 const html = readFileSync("app/src/main/assets/benches/docbench/portable.html", "utf8");
 const has = (id) => html.includes(`id="${id}"`);
 const v1 = html.includes("DocBenchFiles = Object.freeze({")
-  && html.includes("importFile: (file) => importLocalFile(store, file,")
-  && html.includes("version: 1");
+  && html.includes("version: 1,\n    importFile: (file) => importLocalFile(store, file,");
 if (!v1) {
   for (const id of ["file-input", "document-tab", "pdf-input", "docx-to-pdf-input", "pdf-tab"]) {
     assert.ok(has(id), `Pinned Docbench lost legacy import control: ${id}`);
