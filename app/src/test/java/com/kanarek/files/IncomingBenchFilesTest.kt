@@ -25,4 +25,28 @@ class IncomingBenchFilesTest {
             assertEquals(BenchFileTarget.DOC, IncomingBenchFiles.classify(filename, "application/octet-stream"))
         }
     }
+
+    @Test fun docbenchScriptPrefersCanonicalFilesIngress() {
+        val script = IncomingBenchFiles.importJavascript(
+            PreparedBenchFile(1L, "archive.zip", "application/zip", byteArrayOf(1, 2), BenchFileTarget.DOC),
+        )
+        org.junit.Assert.assertTrue(script.contains("window.DocBenchFiles"))
+        org.junit.Assert.assertTrue(script.contains("docbench?.version === 1"))
+        org.junit.Assert.assertTrue(script.contains("docbench.importFile(file)?.ok === true"))
+        org.junit.Assert.assertTrue(script.contains("document-tab"))
+        org.junit.Assert.assertTrue(script.contains("DataTransfer"))
+    }
+
+    @Test fun nativeRoutePreservesCodebenchAndPlaylistInputs() {
+        val image = IncomingBenchFiles.importJavascript(
+            PreparedBenchFile(2L, "code.png", "image/png", byteArrayOf(3), BenchFileTarget.CODE),
+        )
+        val playlist = IncomingBenchFiles.importJavascript(
+            PreparedBenchFile(3L, "radio.m3u", "text/plain", byteArrayOf(4), BenchFileTarget.STREAM),
+        )
+        org.junit.Assert.assertTrue(image.contains("const input = document.getElementById(\"fileInput\")"))
+        org.junit.Assert.assertTrue(playlist.contains("const input = document.getElementById(\"playlistFile\")"))
+        org.junit.Assert.assertTrue(image.contains("if (false && docbench?.version === 1"))
+        org.junit.Assert.assertTrue(playlist.contains("if (false && docbench?.version === 1"))
+    }
 }
