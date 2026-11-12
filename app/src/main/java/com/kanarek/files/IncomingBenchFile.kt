@@ -167,16 +167,26 @@ object IncomingBenchFiles {
         val encoded = Base64.encodeToString(payload.bytes, Base64.NO_WRAP)
         return """
             (function () {
-                const input = document.getElementById(${JSONObject.quote(inputId)});
-                if (!input || typeof DataTransfer === 'undefined') return false;
                 const decoded = atob(${JSONObject.quote(encoded)});
                 const bytes = new Uint8Array(decoded.length);
                 for (let i = 0; i < decoded.length; i++) bytes[i] = decoded.charCodeAt(i);
                 const file = new File([bytes], ${JSONObject.quote(payload.filename)}, {type: ${JSONObject.quote(safeMime)}});
+                // Docbench v1 accepts a File in its canonical Files workspace.
+                // Older pinned portable builds use the legacy input controls below.
+                const docbench = window.DocBenchFiles;
+                if (${payload.target == BenchFileTarget.DOC} && docbench?.version === 1 &&
+                    typeof docbench.importFile === 'function') {
+                    try { return docbench.importFile(file)?.ok === true; }
+                    catch (_) { return false; }
+                }
+                const input = document.getElementById(${JSONObject.quote(inputId)});
+                if (!input || typeof DataTransfer === 'undefined') return false;
                 const transfer = new DataTransfer();
                 transfer.items.add(file);
                 if (${JSONObject.quote(inputId)} === "fileInput") {
                     document.querySelector('[data-tab="scan"]')?.click();
+                } else if (${JSONObject.quote(inputId)} === "file-input") {
+                    document.getElementById("document-tab")?.click();
                 } else if (${JSONObject.quote(inputId)} === "pdf-input" ||
                            ${JSONObject.quote(inputId)} === "docx-to-pdf-input") {
                     document.getElementById("pdf-tab")?.click();

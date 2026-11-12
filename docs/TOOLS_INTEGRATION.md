@@ -27,6 +27,15 @@ Each bundled Bench has its own HTTPS-like `WebViewAssetLoader` origin, e.g. `htt
 - The scanner interprets common QR payloads (URLs, Wi-Fi, contacts, calendar events, calls/messages, location and text). External actions need an explicit tap. Sensitive Wi-Fi passwords are masked in the preview.
 - The Scan Quick Settings tile uses a one-use token before automatic camera opening. No QR content is silently stored or sent to a Worker.
 
+For first-party native imports, Docbench v1 exposes
+`DocBenchFiles.importFile(File)`: a synchronous acceptance result
+`{ ok, id? }` that opens the canonical Files workspace. The import is
+browser-local and does not select an editor or silently overwrite existing
+content. Older pinned portable builds use their legacy input IDs, with
+the Documents/PDF tab activated before dispatch. The staging script checks
+the pinned portable HTML against this compatibility boundary on each build.
+A Files-first portable update without the v1 contract must not ship.
+
 The native WebView bridge is deliberately constrained: `KanarekExport` is bundled-main-frame-only; Codebench's `KanarekScan` accepts its bundled or exact hosted origin. No general-purpose JS interface for unrelated websites, broad filesystem permissions or unbounded downloads. The bundled path follows AndroidX's `WebViewAssetLoader` HTTPS-origin model.
 
 ## Constraints and follow-up validation
