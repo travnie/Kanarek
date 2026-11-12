@@ -37,8 +37,11 @@ class IncomingBenchFilesTest {
         )
         org.junit.Assert.assertTrue(script.contains("window.DocBenchFiles"))
         org.junit.Assert.assertTrue(script.contains("docbench?.version === 1"))
-        org.junit.Assert.assertTrue(script.contains("docbench.importFile(file)?.ok === true"))
+        org.junit.Assert.assertTrue(script.contains("if (true && docbench?.version === 1"))
+        org.junit.Assert.assertTrue(script.contains("return docbench.importFile(file)?.ok === true;"))
         org.junit.Assert.assertTrue(script.contains("document-tab"))
+        org.junit.Assert.assertTrue(script.contains("input.files = transfer.files;"))
+        org.junit.Assert.assertTrue(script.contains("input.dispatchEvent(new Event(\"change\""))
         org.junit.Assert.assertTrue(script.contains("DataTransfer"))
     }
 
