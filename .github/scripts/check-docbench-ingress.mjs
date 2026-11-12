@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 
 // Source-of-truth boundary: old two-tab Docbench or v1 Files ingress.
-const html = readFileSync("app/src/main/assets/benches/docbench/portable.html", "utf8");
+const html = readFileSync(0, "utf8");
 const has = (id) => html.includes(`id="${id}"`);
 const v1 = html.includes("DocBenchFiles = Object.freeze({")
   && html.includes("version: 1,\n    importFile: (file) => importLocalFile(store, file,");
