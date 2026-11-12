@@ -27,8 +27,9 @@ Each bundled Bench has its own HTTPS-like `WebViewAssetLoader` origin, e.g. `htt
 - The scanner interprets common QR payloads (URLs, Wi-Fi, contacts, calendar events, calls/messages, location and text). External actions need an explicit tap. Sensitive Wi-Fi passwords are masked in the preview.
 - The Scan Quick Settings tile uses a one-use token before automatic camera opening. No QR content is silently stored or sent to a Worker.
 
-For first-party native imports, Docbench v1 exposes
-`DocBenchFiles.importFile(File)`: a synchronous acceptance result
+For first-party native imports, the companion upstream change
+[travnie/twojstar#460](https://github.com/travnie/twojstar/pull/460)
+introduces Docbench v1 `DocBenchFiles.importFile(File)`: a synchronous acceptance result
 `{ ok, id? }` that opens the canonical Files workspace. The import is
 browser-local and does not select an editor or silently overwrite existing
 content. Older pinned portable builds use their legacy input IDs, with
