@@ -16,7 +16,7 @@ castFramework = "23.0.0"
 junit = "4.13.2"
 robolectric = "4.17"
 roborazzi = "1.77.0"
-rssParser = "6.1.8"
+rssParser = "6.2.0"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
