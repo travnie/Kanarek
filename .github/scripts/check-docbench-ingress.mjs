@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 
 // Source-of-truth boundary: old two-tab Docbench or v1 Files ingress.
-const html = readFileSync(process.argv[2], "utf8");
+const html = readFileSync("app/src/main/assets/benches/docbench/portable.html", "utf8");
 const has = (id) => html.includes(`id="${id}"`);
 for (const id of ["file-input", "document-tab", "pdf-input", "docx-to-pdf-input", "pdf-tab"]) {
   assert.ok(has(id), `Pinned Docbench lost legacy import control: ${id}`);
