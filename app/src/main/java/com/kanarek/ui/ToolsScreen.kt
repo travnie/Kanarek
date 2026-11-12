@@ -178,9 +178,11 @@ internal fun ToolsScreen(
         mutableStateOf<Triple<IncomingBenchFile, BenchFileTarget, Boolean>?>(null)
     }
     fun cancelPendingModeFile() {
-        pendingModeFile?.let { onFileHandled(it.first.id) }
+        pendingModeFile?.let {
+            onFileHandled(it.first.id)
+            processingFileId = null
+        }
         pendingModeFile = null
-        processingFileId = null
     }
     fun startFileImport(source: IncomingBenchFile, target: BenchFileTarget, hosted: Boolean) {
         processingFileId = source.id
@@ -206,23 +208,23 @@ internal fun ToolsScreen(
         }
     }
     val selected = Bench.entries.firstOrNull { it.name == selectedKey }
-    fun cancelPendingHostedImport() {
-        preparedFile?.let { pending ->
-            onFileHandled(pending.id)
-            preparedFile = null
-            processingFileId = null
-            fileError = importFailureMessage
-        }
+    fun cancelPendingHostedImport(): Boolean {
+        val pending = preparedFile ?: return false
+        onFileHandled(pending.id)
+        preparedFile = null
+        processingFileId = null
+        fileError = importFailureMessage
+        return true
     }
     LaunchedEffect(useHosted, hostedLoading, selected, isActive) {
         if (isActive && selected != null && useHosted && hostedLoading) {
             delay(15_000)
             if (useHosted && hostedLoading) {
                 // Never deliver a hosted-only file to the pinned legacy offline editor.
-                cancelPendingHostedImport()
+                val importCanceled = cancelPendingHostedImport()
                 hostedLoading = false
                 useHosted = false
-                modeNotice = R.string.tools_online_load_failed
+                if (!importCanceled) modeNotice = R.string.tools_online_load_failed
             }
         }
     }
@@ -350,10 +352,10 @@ internal fun ToolsScreen(
                 onHostedLoaded = { if (useHosted) hostedLoading = false },
                 onHostedFailed = {
                     if (useHosted) {
-                        cancelPendingHostedImport()
+                        val importCanceled = cancelPendingHostedImport()
                         hostedLoading = false
                         useHosted = false
-                        modeNotice = R.string.tools_online_load_failed
+                        if (!importCanceled) modeNotice = R.string.tools_online_load_failed
                     }
                 },
                 incomingFile = preparedFile?.takeIf { it.target.name == benchKey(selected) },
