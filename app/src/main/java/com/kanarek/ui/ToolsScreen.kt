@@ -363,14 +363,29 @@ internal fun ToolsScreen(
     }
     if (isActive) {
         inboundFile?.takeIf { it.id != processingFileId }?.let { source ->
-            val options = when (source.suggested) {
-                BenchFileTarget.CODE -> listOf(BenchFileTarget.CODE)
-                BenchFileTarget.STREAM -> listOf(BenchFileTarget.STREAM, BenchFileTarget.DOC)
-                BenchFileTarget.DOC -> if (source.filename.endsWith(".xml", true) ||
-                    source.mime.equals("application/xml", true) ||
-                    source.mime.equals("text/xml", true)
-                ) listOf(BenchFileTarget.DOC, BenchFileTarget.STREAM)
-                else listOf(BenchFileTarget.DOC)
+            val options = IncomingBenchFiles.destinations(source)
+            fun selectFileTarget(target: BenchFileTarget, hosted: Boolean) {
+                processingFileId = source.id
+                scope.launch {
+                    openingFile = true
+                    try {
+                        val ready = IncomingBenchFiles.prepare(context, source, target)
+                        val startsHostedLoad = hosted && (selectedKey != target.name || !useHosted)
+                        preparedFile = ready
+                        useHosted = hosted
+                        hostedLoading = startsHostedLoad
+                        selectedKey = target.name
+                    } catch (error: Exception) {
+                        fileError =
+                            if ((error as? BenchImportException)?.reason ==
+                                BenchImportException.Reason.TOO_LARGE
+                            ) tooLargeMessage else importFailureMessage
+                        processingFileId = null
+                        onFileHandled(source.id)
+                    } finally {
+                        openingFile = false
+                    }
+                }
             }
             AlertDialog(
                 onDismissRequest = { onFileHandled(source.id) },
@@ -383,28 +398,20 @@ internal fun ToolsScreen(
                             else R.string.open_with_privacy,
                         ))
                         options.forEach { target ->
-                            TextButton(onClick = {
-                                processingFileId = source.id
-                                scope.launch {
-                                    openingFile = true
-                                    try {
-                                        val ready = IncomingBenchFiles.prepare(context, source, target)
-                                        preparedFile = ready
-                                        useHosted = false
-                                        selectedKey = target.name
-                                    } catch (error: Exception) {
-                                        fileError =
-                                            if ((error as? BenchImportException)?.reason ==
-                                                BenchImportException.Reason.TOO_LARGE
-                                            ) tooLargeMessage else importFailureMessage
-                                        processingFileId = null
-                                        onFileHandled(source.id)
-                                    } finally {
-                                        openingFile = false
-                                    }
+                            // Images are Codebench-first; the pinned legacy Docbench cannot preview them.
+                            val needsOnlineFiles = target == BenchFileTarget.DOC &&
+                                source.suggested == BenchFileTarget.CODE
+                            if (!needsOnlineFiles) {
+                                TextButton(onClick = { selectFileTarget(target, hosted = false) }) {
+                                    Text(Bench.valueOf(target.name).label)
                                 }
-                            }) {
-                                Text(Bench.valueOf(target.name).label)
+                            }
+                            if (target == BenchFileTarget.DOC && hasHostedConnection(context) &&
+                                (needsOnlineFiles || bundledBenches[Bench.DOC] == true)
+                            ) {
+                                TextButton(onClick = { selectFileTarget(target, hosted = true) }) {
+                                    Text(stringResource(R.string.open_with_docbench_online))
+                                }
                             }
                         }
                     }
@@ -504,7 +511,7 @@ private fun BenchWebView(
         dispatchedFileId = incoming.id
         scope.launch {
             val script = withContext(Dispatchers.Default) {
-                IncomingBenchFiles.importJavascript(incoming)
+                IncomingBenchFiles.importJavascript(incoming, requireFilesIngress = !offline)
             }
             if (view.url?.let(Uri::parse)?.let(::trustedPage) != true ||
                 view.progress < 100
