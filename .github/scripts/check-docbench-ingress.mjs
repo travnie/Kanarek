@@ -5,7 +5,7 @@ import { pathToFileURL } from "node:url";
 // Inspect the staged portable page, then exercise its pinned source API.
 const html = readFileSync(0, "utf8");
 const has = (id) => html.includes(`id="${id}"`);
-if (has("files-workspace")) {
+if (has("files-workspace") || /\bDocBenchFiles\s*=/.test(html)) {
   const source = process.argv[2];
   assert.ok(source, "Files-first Docbench requires a pinned source module path");
   assert.match(html, /nativeIngress\s*=\s*createFileIngress\s*\(\s*store\s*,/);
