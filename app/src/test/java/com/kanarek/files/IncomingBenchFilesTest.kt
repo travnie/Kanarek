@@ -1,6 +1,8 @@
 package com.kanarek.files
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -9,6 +11,16 @@ import org.robolectric.annotation.Config
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [33])
 class IncomingBenchFilesTest {
+    @Test fun imagesCanAlsoOpenInOnlineDocbench() {
+        val photo = IncomingBenchFile(1L, null, "photo.png", "image/png", 4L, BenchFileTarget.CODE)
+        assertEquals(listOf(BenchFileTarget.CODE, BenchFileTarget.DOC), IncomingBenchFiles.destinations(photo))
+    }
+
+    @Test fun playlistsKeepTheirDocbenchAlternative() {
+        val playlist = IncomingBenchFile(2L, null, "list.m3u", "text/plain", 4L, BenchFileTarget.STREAM)
+        assertEquals(listOf(BenchFileTarget.STREAM, BenchFileTarget.DOC), IncomingBenchFiles.destinations(playlist))
+    }
+
     @Test fun imageNamesRouteToCodebench() {
         assertEquals(BenchFileTarget.CODE, IncomingBenchFiles.classify("code.webp", "application/octet-stream"))
         assertEquals(BenchFileTarget.CODE, IncomingBenchFiles.classify("photo.bin", "image/png"))
@@ -36,8 +48,8 @@ class IncomingBenchFilesTest {
             PreparedBenchFile(1L, "archive.zip", "application/zip", byteArrayOf(1, 2), BenchFileTarget.DOC),
         )
         org.junit.Assert.assertTrue(script.contains("window.DocBenchFiles"))
-        org.junit.Assert.assertTrue(script.contains("docbench?.version === 1"))
-        org.junit.Assert.assertTrue(script.contains("if (true && docbench?.version === 1"))
+        assertTrue(script.contains("docbench?.version !== 1"))
+        assertTrue(script.contains("document.getElementById('files-workspace')"))
         org.junit.Assert.assertTrue(script.contains("return docbench.importFile(file)?.ok === true;"))
         val apiCall = script.indexOf("return docbench.importFile(file)")
         val legacyInput = script.indexOf("const input = document.getElementById(")
@@ -57,7 +69,26 @@ class IncomingBenchFilesTest {
         )
         org.junit.Assert.assertTrue(image.contains("const input = document.getElementById(\"fileInput\")"))
         org.junit.Assert.assertTrue(playlist.contains("const input = document.getElementById(\"playlistFile\")"))
-        org.junit.Assert.assertTrue(image.contains("if (false && docbench?.version === 1"))
-        org.junit.Assert.assertTrue(playlist.contains("if (false && docbench?.version === 1"))
+        assertTrue(image.contains("if (false && ("))
+        assertTrue(playlist.contains("if (false && ("))
     }
+    @Test fun hostedDocbenchRequiresReadyV1BeforeLegacyDispatch() {
+        val script = IncomingBenchFiles.importJavascript(
+            PreparedBenchFile(4L, "notes.md", "text/markdown", byteArrayOf(1), BenchFileTarget.DOC),
+            requireFilesIngress = true,
+        )
+        val entry = script.indexOf("if (true && (")
+        val mustUseV1 = script.indexOf("docbench?.version !== 1")
+        val deny = script.indexOf("return false", mustUseV1)
+        val legacy = script.indexOf("const input = document.getElementById(")
+        assertTrue(entry >= 0 && mustUseV1 > entry && deny > mustUseV1 && legacy > deny)
+        assertTrue(script.contains("typeof docbench.importFile !== 'function'"))
+    }
+
+    @Test fun fileWorkbenchFormatsDefaultToDocbench() {
+        for (name in listOf("archive.zip", "recording.flac", "sample.ogg", "slides.pptx")) {
+            assertEquals(BenchFileTarget.DOC, IncomingBenchFiles.classify(name, "application/octet-stream"))
+        }
+    }
+
 }

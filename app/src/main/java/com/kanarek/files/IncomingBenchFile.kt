@@ -61,6 +61,16 @@ object IncomingBenchFiles {
         return BenchFileTarget.DOC
     }
 
+    fun destinations(source: IncomingBenchFile): List<BenchFileTarget> = when (source.suggested) {
+        BenchFileTarget.CODE -> listOf(BenchFileTarget.CODE, BenchFileTarget.DOC)
+        BenchFileTarget.STREAM -> listOf(BenchFileTarget.STREAM, BenchFileTarget.DOC)
+        BenchFileTarget.DOC -> if (source.filename.endsWith(".xml", true) ||
+            source.mime.equals("application/xml", true) ||
+            source.mime.equals("text/xml", true)
+        ) listOf(BenchFileTarget.DOC, BenchFileTarget.STREAM)
+        else listOf(BenchFileTarget.DOC)
+    }
+
     @Suppress("DEPRECATION")
     fun fromIntent(intent: Intent?, resolver: ContentResolver): IncomingBenchFile? {
         if (intent == null || intent.action !in setOf(Intent.ACTION_VIEW, Intent.ACTION_SEND)) return null
@@ -134,7 +144,7 @@ object IncomingBenchFiles {
 
     // No URI, file path or JS native-command interface is exposed to the page.
     // All strings are JSON-quoted and the content is encoded as base64.
-    fun importJavascript(payload: PreparedBenchFile): String {
+    fun importJavascript(payload: PreparedBenchFile, requireFilesIngress: Boolean = false): String {
         val inputId = when (payload.target) {
             BenchFileTarget.CODE -> "fileInput"
             BenchFileTarget.STREAM -> if (payload.filename.endsWith(".xmltv", true) ||
@@ -174,8 +184,12 @@ object IncomingBenchFiles {
                 // Docbench v1 accepts a File in its canonical Files workspace.
                 // Older pinned portable builds use the legacy input controls below.
                 const docbench = window.DocBenchFiles;
-                if (${payload.target == BenchFileTarget.DOC} && docbench?.version === 1 &&
-                    typeof docbench.importFile === 'function') {
+                // Files-first builds must never fall back to a hidden legacy editor.
+                if (${payload.target == BenchFileTarget.DOC} && (
+                    ${requireFilesIngress} || docbench !== undefined ||
+                    document.getElementById('files-workspace')
+                )) {
+                    if (docbench?.version !== 1 || typeof docbench.importFile !== 'function') return false;
                     try { return docbench.importFile(file)?.ok === true; }
                     catch (_) { return false; }
                 }

@@ -36,6 +36,11 @@ content. Older pinned portable builds use their legacy input IDs, with
 the Documents/PDF tab activated before dispatch. The staging script checks
 the pinned portable HTML against this compatibility boundary on each build.
 A Files-first portable update without the v1 contract must not ship.
+Hosted Docbench additionally requires a ready v1 API, failing closed instead
+of silently dispatching to a hidden editor. Image shares remain Codebench-first,
+with Docbench Files offered only in online mode while the pinned offline version
+is still the legacy editor. A separate online option makes the upload boundary
+explicit when choosing an otherwise bundled Docbench.
 
 The native WebView bridge is deliberately constrained: `KanarekExport` is bundled-main-frame-only; Codebench's `KanarekScan` accepts its bundled or exact hosted origin. No general-purpose JS interface for unrelated websites, broad filesystem permissions or unbounded downloads. The bundled path follows AndroidX's `WebViewAssetLoader` HTTPS-origin model.
 
