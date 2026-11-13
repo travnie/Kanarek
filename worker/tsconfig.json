@@ -6,10 +6,12 @@
     "lib": ["ES2022"],
     "types": ["@cloudflare/workers-types"],
     "strict": true,
+    "allowJs": true,
+    "checkJs": true,
     "noEmit": true,
     "skipLibCheck": true,
     "esModuleInterop": true,
     "forceConsistentCasingInFileNames": true
   },
-  "include": ["src/**/*.ts"]
+  "include": ["src/**/*.ts", "src/**/*.js"]
 }
