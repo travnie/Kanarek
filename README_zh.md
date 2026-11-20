@@ -98,7 +98,7 @@ gradle wrapper --gradle-version "$GRADLE_VERSION" --no-daemon
 ## 💬 抽屉里的引语
 <!-- markdownlint-disable MD033 -->
 <!--STARTS_HERE_QUOTE_README-->
-<i>❝Imagination is eye of the soul. — Anonymous❞</i>
+<i>❝Study me as much as you like, you will not know me, for I differ in a hundred ways from what you see me to be. Put yourself behind my eyes and see me as I see myself, for I have chosen to dwell in a place you cannot see. — Rumi❞</i>
 <!--ENDS_HERE_QUOTE_README-->
 <!-- markdownlint-enable MD033 -->
 
