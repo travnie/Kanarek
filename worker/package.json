@@ -16,6 +16,6 @@
     "wrangler": "^4.162.0"
   },
   "dependencies": {
-    "feedsmith": "^3.0.1"
+    "feedsmith": "^3.1.0"
   }
 }
