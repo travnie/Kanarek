@@ -10,17 +10,38 @@ on: # yamllint disable-line rule:truthy
 
 concurrency:
   group: android-ci-${{ github.ref }}
-  cancel-in-progress: true
+  # Never cancel a main run while its signed release is publishing.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   build:
+    outputs:
+      release_required: ${{ steps.release-scope.outputs.required }}
     runs-on: ubuntu-latest
     permissions:
       contents: read
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          fetch-depth: 2
           persist-credentials: false
+
+      - name: Select rolling release scope
+        id: release-scope
+        if: github.event_name == 'push'
+        env:
+          BASE_SHA: ${{ github.event.before }}
+        run: |
+          required=true
+          if [[ -n "$BASE_SHA" && ! "$BASE_SHA" =~ ^0+$ ]]; then
+            if git cat-file -e "$BASE_SHA^{commit}" 2>/dev/null || git fetch --no-tags --depth=1 origin "$BASE_SHA"; then
+              if git diff --quiet "$BASE_SHA" HEAD -- app/ shared/ build.gradle.kts settings.gradle.kts gradle.properties gradle/ \
+                .github/scripts/gradle-version.sh .github/scripts/stage-benches.sh .github/workflows/release.yml; then
+                required=false
+              fi
+            fi
+          fi
+          echo "required=$required" >> "$GITHUB_OUTPUT"
 
       - name: Set up JDK 17
         uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880 # v6.3.0
@@ -37,12 +58,13 @@ jobs:
         run: bash .github/scripts/stage-benches.sh
 
       - name: Upload verified Bench assets for rolling release
+        if: github.event_name == 'pull_request' || steps.release-scope.outputs.required == 'true'
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: verified-benches
           path: app/src/main/assets/benches/
           if-no-files-found: error
-          retention-days: 3
+          retention-days: ${{ github.event_name == 'push' && 30 || 1 }}
 
       - name: Read the Gradle version from the wrapper properties
         id: gradle
@@ -209,6 +231,14 @@ jobs:
           retention-days: 14
           if-no-files-found: warn
 
+
+  rolling-release:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.build.outputs.release_required == 'true'
+    needs: [build, emulator-smoke]
+    permissions:
+      contents: write
+    uses: ./.github/workflows/release.yml
+    secrets: inherit
 
   # Two jobs, and the split is the whole point: the graph is resolved by *running the
   # project's own build logic*, so a pull request branch must never do that with a
