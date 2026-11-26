@@ -35,10 +35,13 @@ jobs:
           # Compare with the published tree, not only the immediately previous push:
           # a pending main run may have been superseded before publishing.
           required=true
-          if published="$(gh api "repos/$GITHUB_REPOSITORY/releases/tags/kanarek-latest" --jq 'if .draft then "" else (.id | tostring) end' 2>/dev/null)" && [ -n "$published" ]; then
+          endpoint="repos/$GITHUB_REPOSITORY/releases/tags/kanarek-latest"
+          published="$(gh api "$endpoint" --jq 'if .draft then "" else .body end' 2>/dev/null)" || published=""
+          if [ -n "$published" ]; then
             if base_sha="$(gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/kanarek-latest" --jq .object.sha 2>/dev/null)" &&
               { git cat-file -e "$base_sha^{commit}" 2>/dev/null || git fetch --no-tags --depth=1 origin "$base_sha"; }; then
-              if git diff --quiet "$base_sha" HEAD -- app/ shared/ build.gradle.kts settings.gradle.kts gradle.properties gradle/ \
+              if grep -Fxq "Published-commit: $base_sha" <<< "$published" &&
+                git diff --quiet "$base_sha" HEAD -- app/ shared/ build.gradle.kts settings.gradle.kts gradle.properties gradle/ \
                 .github/scripts/gradle-version.sh .github/scripts/stage-benches.sh .github/workflows/release.yml; then
                 required=false
               fi
@@ -237,11 +240,16 @@ jobs:
 
   rolling-release:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.build.outputs.release_required == 'true'
-    needs: [build, emulator-smoke]
+    needs: [build, emulator-smoke, dependency-graph-submit]
     permissions:
       contents: write
+      actions: read
     uses: ./.github/workflows/release.yml
-    secrets: inherit
+    secrets:
+      KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+      KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+      KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+      KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
 
   # Two jobs, and the split is the whole point: the graph is resolved by *running the
   # project's own build logic*, so a pull request branch must never do that with a
