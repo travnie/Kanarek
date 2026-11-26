@@ -51,6 +51,7 @@ jobs:
     needs: bench-assets
     concurrency:
       group: kanarek-rolling-release
+      queue: max
       cancel-in-progress: false
     permissions:
       contents: write

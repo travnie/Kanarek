@@ -23,6 +23,11 @@ ENABLE_LINTERS:
   - YAML_V8R
   - YAML_YAMLLINT
 
+# actionlint 1.7.12 predates GitHub's concurrency queue key. Remove on upgrade.
+ACTION_ACTIONLINT_ARGUMENTS:
+  - "-ignore"
+  - 'unexpected key "queue" for "concurrency" section'
+
 ACTION_ZIZMOR_RULES_PATH: ".github/linters"
 ACTION_ZIZMOR_CONFIG_FILE: "zizmor.yml"
 ACTION_ZIZMOR_ARGUMENTS:
