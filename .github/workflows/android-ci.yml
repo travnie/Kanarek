@@ -36,6 +36,14 @@ jobs:
       - name: Stage offline Benches from pinned source
         run: bash .github/scripts/stage-benches.sh
 
+      - name: Upload verified Bench assets for rolling release
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: verified-benches
+          path: app/src/main/assets/benches/
+          if-no-files-found: error
+          retention-days: 3
+
       - name: Read the Gradle version from the wrapper properties
         id: gradle
         run: .github/scripts/gradle-version.sh
