@@ -68,7 +68,9 @@ Screenshots and a feature graphic are optional polish rather than submission blo
 
 The repository intentionally does not commit `gradlew` or `gradle-wrapper.jar`. F-Droid build servers provide `gradlew-fdroid`, which reads the pinned Gradle version from `gradle/wrapper/gradle-wrapper.properties`.
 
-Kanarek currently compiles against Android 37. Current fdroiddata recipes install that SDK explicitly when needed, so the build entry installs `platforms;android-37.0` and `build-tools;37.0.0` before Gradle runs.
+The pinned submission above compiles against Android 37.0. Keep its SDK setup unchanged.
+
+Current checkout: app requires Android 37.1; shared requires 37.0. Install both `platforms;android-37.0` and `platforms;android-37.1`, plus `build-tools;37.0.0`. Update the F-Droid prebuild SDK list for the next release.
 
 The optional `worker/` backend is not part of the APK and is not required for ordinary on-device RSS/Atom parsing.
 
