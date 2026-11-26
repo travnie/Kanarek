@@ -53,3 +53,7 @@ jobs:
           npm ci
           npm run typecheck
           npm test
+
+      - name: Validate Wrangler bundle (no deploy)
+        working-directory: worker
+        run: npx --no-install wrangler deploy --dry-run --outdir "$RUNNER_TEMP/kanarek-worker"
