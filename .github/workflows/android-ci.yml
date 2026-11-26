@@ -30,12 +30,15 @@ jobs:
         id: release-scope
         if: github.event_name == 'push'
         env:
-          BASE_SHA: ${{ github.event.before }}
+          GH_TOKEN: ${{ github.token }}
         run: |
+          # Compare with the published tree, not only the immediately previous push:
+          # a pending main run may have been superseded before publishing.
           required=true
-          if [[ -n "$BASE_SHA" && ! "$BASE_SHA" =~ ^0+$ ]]; then
-            if git cat-file -e "$BASE_SHA^{commit}" 2>/dev/null || git fetch --no-tags --depth=1 origin "$BASE_SHA"; then
-              if git diff --quiet "$BASE_SHA" HEAD -- app/ shared/ build.gradle.kts settings.gradle.kts gradle.properties gradle/ \
+          if published="$(gh api "repos/$GITHUB_REPOSITORY/releases/tags/kanarek-latest" --jq 'if .draft then "" else (.id | tostring) end' 2>/dev/null)" && [ -n "$published" ]; then
+            if base_sha="$(gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/kanarek-latest" --jq .object.sha 2>/dev/null)" &&
+              { git cat-file -e "$base_sha^{commit}" 2>/dev/null || git fetch --no-tags --depth=1 origin "$base_sha"; }; then
+              if git diff --quiet "$base_sha" HEAD -- app/ shared/ build.gradle.kts settings.gradle.kts gradle.properties gradle/ \
                 .github/scripts/gradle-version.sh .github/scripts/stage-benches.sh .github/workflows/release.yml; then
                 required=false
               fi
