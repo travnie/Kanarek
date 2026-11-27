@@ -191,9 +191,19 @@ jobs:
         run: |
           set -euo pipefail
           tag="kanarek-latest"
-          # A slower older CI run must not roll back a newer published build.
+          # Do not publish a superseded release tree, even if no public release exists.
+          git fetch --no-tags origin main
+          if ! git merge-base --is-ancestor "$BUILT_SHA" FETCH_HEAD ||
+            ! git diff --quiet "$BUILT_SHA" FETCH_HEAD -- app/ shared/ build.gradle.kts settings.gradle.kts gradle.properties gradle/ \
+              .github/scripts/gradle-version.sh .github/scripts/stage-benches.sh .github/workflows/release.yml; then
+            echo "::warning::Candidate differs from current main release inputs; keeping last-good release."
+            exit 0
+          fi
+          # An orphan ref alone is not proof of published APKs. The backup step
+          # confirmed and preserved the actual public release, if any.
           lookup_err="$RUNNER_TEMP/rolling-ref-lookup.err"
-          if old_sha="$(gh api "repos/$GH_REPO/git/ref/tags/$tag" --jq .object.sha 2>"$lookup_err")"; then
+          if [ -s "$RUNNER_TEMP/kanarek-rolling-backup/release.json" ]; then
+            old_sha="$(cat "$RUNNER_TEMP/kanarek-rolling-backup/sha")"
             git cat-file -e "$old_sha^{commit}" || git fetch --no-tags origin "$old_sha"
             if [ "$old_sha" != "$BUILT_SHA" ] && git merge-base --is-ancestor "$BUILT_SHA" "$old_sha"; then
               echo "A newer commit is already published; skipping stale release."
@@ -203,9 +213,6 @@ jobs:
               echo "::error::Rolling tag is not an ancestor of the verified build."
               exit 1
             }
-          elif ! grep -q 'HTTP 404' "$lookup_err"; then
-            cat "$lookup_err" >&2
-            exit 1
           fi
 
           stage="kanarek-stage-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
