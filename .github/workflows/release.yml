@@ -148,6 +148,41 @@ jobs:
           cp app/build/outputs/apk/play/release/app-play-release.apk dist/kanarek.apk
           cp app/build/outputs/apk/foss/release/app-foss-release.apk dist/kanarek-foss.apk
 
+      - name: Back up current rolling release
+        id: backup
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          tag=kanarek-latest
+          backup_dir="$RUNNER_TEMP/kanarek-rolling-backup"
+          lookup_err="$RUNNER_TEMP/rolling-backup.err"
+          mkdir -p "$backup_dir"
+          if old_id="$(gh api "repos/$GH_REPO/releases/tags/$tag" --jq .id 2>"$lookup_err")"; then
+            old_sha="$(gh api "repos/$GH_REPO/git/ref/tags/$tag" --jq .object.sha)"
+            gh release download "$tag" --dir "$backup_dir" --pattern 'kanarek.apk' --pattern 'kanarek-foss.apk'
+            test -s "$backup_dir/kanarek.apk"
+            test -s "$backup_dir/kanarek-foss.apk"
+            gh api "repos/$GH_REPO/releases/$old_id" > "$backup_dir/release.json"
+            printf '%s\n' "$old_sha" > "$backup_dir/sha"
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          elif grep -q 'HTTP 404' "$lookup_err"; then
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          else
+            cat "$lookup_err" >&2
+            exit 1
+          fi
+
+      - name: Preserve last good rolling release
+        if: steps.backup.outputs.exists == 'true'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: rolling-release-backup-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/kanarek-rolling-backup/
+          retention-days: 7
+          if-no-files-found: error
+
       - name: Publish rolling release
         env:
           GH_TOKEN: ${{ github.token }}
@@ -198,12 +233,20 @@ jobs:
             return 1
           }
 
+          is_absent() {
+            local path="$1" err="$RUNNER_TEMP/rolling-absence.err"
+            if gh api "$path" >/dev/null 2>"$err"; then
+              return 1
+            fi
+            grep -q 'HTTP 404' "$err"
+          }
+
           wait_for_absent_release_and_tag() {
             local wanted="$1" deadline
             deadline=$((SECONDS + 60))
             while [ "$SECONDS" -lt "$deadline" ]; do
-              if ! gh api "repos/$GH_REPO/releases/tags/$wanted" >/dev/null 2>&1 \
-                && ! gh api "repos/$GH_REPO/git/ref/tags/$wanted" >/dev/null 2>&1; then
+              if is_absent "repos/$GH_REPO/releases/tags/$wanted" &&
+                is_absent "repos/$GH_REPO/git/ref/tags/$wanted"; then
                 return 0
               fi
               sleep 2
@@ -212,57 +255,66 @@ jobs:
           }
 
           cleanup_failed_promotion() {
-            status=$?
-            trap - EXIT
+            local status=$? restored_sha
+            trap - EXIT INT TERM
             set +e
+            [ "$status" -ne 0 ] || return 0
+            echo "::warning::Promotion failed; attempting rollback."
 
-            if [ "$status" -eq 0 ]; then
-              return 0
+            # If old deletion was attempted but did not succeed, leave the old release alone.
+            if [ "$old_deleted" = true ] && ! is_absent "repos/$GH_REPO/releases/$old_id"; then
+              echo "::warning::Old release deletion not confirmed; preserving staged release and backup."
+              exit "$status"
             fi
 
-            echo "::warning::Rolling release promotion failed; cleaning staging state."
-
             if [ -n "$release_id" ]; then
-              gh api --method DELETE "repos/$GH_REPO/releases/$release_id" >/dev/null 2>&1 || true
-            else
-              if staged_id="$(release_id_for_tag "$stage")" && [ -n "$staged_id" ]; then
-                gh api --method DELETE "repos/$GH_REPO/releases/$staged_id" >/dev/null 2>&1 || true
+              if ! gh api --method DELETE "repos/$GH_REPO/releases/$release_id" >/dev/null 2>&1 &&
+                ! is_absent "repos/$GH_REPO/releases/$release_id"; then
+                echo "::error::Could not remove staged release; backup retained."
+                exit "$status"
               fi
+            elif staged_id="$(release_id_for_tag "$stage")" && [ -n "$staged_id" ]; then
+              gh api --method DELETE "repos/$GH_REPO/releases/$staged_id" >/dev/null 2>&1 || true
             fi
             gh api --method DELETE "repos/$GH_REPO/git/refs/tags/$stage" >/dev/null 2>&1 || true
 
             if [ "$old_deleted" = true ]; then
-              gh release delete "$tag" --cleanup-tag --yes >/dev/null 2>&1 || true
-              gh api --method DELETE "repos/$GH_REPO/git/refs/tags/$tag" >/dev/null 2>&1 || true
-              if [ -s "$backup_dir/kanarek.apk" ] && [ -s "$backup_dir/kanarek-foss.apk" ]; then
-                restore_args=(
-                  "$tag"
-                  "$backup_dir/kanarek.apk"
-                  "$backup_dir/kanarek-foss.apk"
-                  --target "$old_ref_sha"
-                  --title "$old_name"
-                  --notes-file "$old_notes"
-                  --latest
-                )
-                if [ "$old_prerelease" = true ]; then
-                  restore_args+=(--prerelease)
+              # Reuse the original ref if tag deletion failed; otherwise restore it explicitly.
+              if restored_sha="$(gh api "repos/$GH_REPO/git/ref/tags/$tag" --jq .object.sha 2>"$lookup_err")"; then
+                if [ "$restored_sha" != "$old_ref_sha" ]; then
+                  gh api --method PATCH "repos/$GH_REPO/git/refs/tags/$tag" \
+                    -f sha="$old_ref_sha" -F force=true >/dev/null || exit "$status"
                 fi
-                if ! gh release create "${restore_args[@]}" >/dev/null 2>&1; then
-                  echo "::error::Could not restore the previous rolling release automatically."
-                  echo "::error::Previous target was $old_ref_sha; use the saved main build if manual recovery is required."
-                fi
+              elif grep -q 'HTTP 404' "$lookup_err"; then
+                gh api --method POST "repos/$GH_REPO/git/refs" \
+                  -f ref="refs/tags/$tag" -f sha="$old_ref_sha" >/dev/null || exit "$status"
               else
-                echo "::error::Previous rolling assets were not preserved; manual recovery may be required."
+                echo "::error::Cannot verify rolling tag; backup retained."
+                exit "$status"
+              fi
+              restore_args=(
+                "$tag" "$backup_dir/kanarek.apk" "$backup_dir/kanarek-foss.apk"
+                --verify-tag --title "$old_name" --notes-file "$old_notes" --latest
+              )
+              if [ "$old_prerelease" = true ]; then restore_args+=(--prerelease); fi
+              if ! gh release create "${restore_args[@]}"; then
+                echo "::error::Rollback failed. Previous APKs and metadata: rolling-release-backup artifact."
               fi
             fi
-
             exit "$status"
           }
           trap cleanup_failed_promotion EXIT
+          trap 'exit 130' INT
+          trap 'exit 143' TERM
 
-          printf 'Signed Android builds from `%s`.\n\nRolling release. Assets are replaced after each successful build of `main`.\nApp version: `%s`.\n' \
-            "$BUILT_SHA" "$RELEASE_VERSION" > release-notes.md
-          printf '\nPublished-commit: %s\n' "$BUILT_SHA" >> release-notes.md
+          cat > release-notes.md <<EOF
+          Signed Android builds from \`$BUILT_SHA\`.
+
+          Rolling release. Assets are replaced after each successful build of \`main\`.
+          App version: \`$RELEASE_VERSION\`.
+
+          Published-commit: $BUILT_SHA
+          EOF
 
           gh release create "$stage" dist/kanarek.apk dist/kanarek-foss.apk \
             --draft --target "$BUILT_SHA" \
@@ -284,17 +336,16 @@ jobs:
               exit 1
             fi
 
-            mkdir -p "$backup_dir"
-            gh release download "$tag" --dir "$backup_dir" \
-              --pattern 'kanarek.apk' --pattern 'kanarek-foss.apk'
-            test -s "$backup_dir/kanarek.apk"
-            test -s "$backup_dir/kanarek-foss.apk"
-            gh api "repos/$GH_REPO/releases/$old_id" --jq '.body // ""' > "$old_notes"
-            old_name="$(gh api "repos/$GH_REPO/releases/$old_id" --jq '.name // "Kanarek · rolling"')"
-            old_prerelease="$(gh api "repos/$GH_REPO/releases/$old_id" --jq '.prerelease')"
+            # The durable backup must match the exact release about to be replaced.
+            test "$(jq -r .id "$backup_dir/release.json")" = "$old_id"
+            test "$(cat "$backup_dir/sha")" = "$old_ref_sha"
+            jq -r '.body // ""' "$backup_dir/release.json" > "$old_notes"
+            old_name="$(jq -r '.name // "Kanarek · rolling"' "$backup_dir/release.json")"
+            old_prerelease="$(jq -r .prerelease "$backup_dir/release.json")"
 
-            gh release delete "$tag" --cleanup-tag --yes
             old_deleted=true
+            gh api --method DELETE "repos/$GH_REPO/releases/$old_id"
+            gh api --method DELETE "repos/$GH_REPO/git/refs/tags/$tag"
             if ! wait_for_absent_release_and_tag "$tag"; then
               echo "::error::Previous rolling release or tag did not disappear within 60 seconds."
               exit 1
@@ -351,5 +402,5 @@ jobs:
 
           final_asset_count="$(gh api "repos/$GH_REPO/releases/tags/$tag" --jq '.assets | length')"
           test "$final_asset_count" -eq 2
-          trap - EXIT
+          trap - EXIT INT TERM
           gh api --method DELETE "repos/$GH_REPO/git/refs/tags/$stage" >/dev/null 2>&1 || true
