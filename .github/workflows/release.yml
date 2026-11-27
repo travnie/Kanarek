@@ -182,12 +182,14 @@ jobs:
 
           # Invalidate completion before changing assets; failed runs cannot be treated as published.
           if gh release view "$tag" >/dev/null 2>&1; then
-            gh release edit "$tag" --notes "Publication pending for $BUILT_SHA."
+            gh release edit "$tag" --draft --notes "Publication pending for $BUILT_SHA."
           else
             gh release create "$tag" --draft --target "$BUILT_SHA" \
               --title "Kanarek · rolling" --notes "Publication pending for $BUILT_SHA."
           fi
 
+          # Verify the release is hidden before replacing the two public assets.
+          test "$(gh release view "$tag" --json isDraft --jq .isDraft)" = true
           gh release upload "$tag" dist/kanarek.apk dist/kanarek-foss.apk --clobber
           if gh api "repos/$GH_REPO/git/ref/tags/$tag" >/dev/null 2>"$lookup_err"; then
             gh api --method PATCH "repos/$GH_REPO/git/refs/tags/$tag" -f sha="$BUILT_SHA" -F force=true
